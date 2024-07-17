@@ -1,4 +1,4 @@
-package gw
+package proxy
 
 import (
 	"context"
@@ -16,11 +16,9 @@ import (
 type Proxy struct {
 	config *config.ProxyConfig // the configuration for the gateway
 	// a list of nostr relays to publish events to
-	relays          []*nostr.Relay
-	pool            *protocol.SimplePool
-	exitNodeChannel chan protocol.IncomingEvent
-	publicKey       string
-	socksServer     *socks5.Server
+	relays      []*nostr.Relay
+	pool        *protocol.SimplePool
+	socksServer *socks5.Server
 }
 
 func NewProxy(ctx context.Context, config *config.ProxyConfig) *Proxy {
@@ -41,7 +39,7 @@ func NewProxy(ctx context.Context, config *config.ProxyConfig) *Proxy {
 		BindIP:      net.IP{0, 0, 0, 0},
 		Logger:      nil,
 		Dial:        nil,
-	}, s.pool, config.NostrPrivateKey)
+	}, s.pool)
 	if err != nil {
 		panic(err)
 	}
@@ -57,45 +55,14 @@ func NewProxy(ctx context.Context, config *config.ProxyConfig) *Proxy {
 		s.relays = append(s.relays, relay)
 		fmt.Printf("added relay connection to %s\n", relayUrl)
 	}
-	pub, err := nostr.GetPublicKey(config.NostrPrivateKey)
-	if err != nil {
-		fmt.Println(err)
-		return nil
-	}
-	s.publicKey = pub
-
 	return s
-}
-
-// NostrDNS does not resolve anything
-type NostrDNS struct{}
-
-func (d NostrDNS) Resolve(ctx context.Context, name string) (context.Context, net.IP, error) {
-	return ctx, net.IP{0, 0, 0, 0}, nil
 }
 
 // Start should start the server
 func (s *Proxy) Start() error {
-	s.subscribe(s.config.NostrRelays)
-	// check if the env variable http-proxy is set
 	err := s.socksServer.ListenAndServe("tcp", "8882")
 	if err != nil {
 		panic(err)
 	}
 	return nil
-}
-
-func (s *Proxy) subscribe(relays []string) {
-	now := nostr.Now()
-	incomingEventChannel := s.pool.SubMany(context.Background(), relays,
-		nostr.Filters{
-			{
-				Kinds: []int{nostr.KindEncryptedDirectMessage},
-				Since: &now,
-				Tags: nostr.TagMap{
-					"p": []string{s.publicKey},
-				},
-			},
-		})
-	s.exitNodeChannel = incomingEventChannel
 }

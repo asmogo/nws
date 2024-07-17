@@ -8,7 +8,6 @@ networks:
         - subnet: fd00:db8:a::/64
           gateway: fd00:db8:a::1
 services:
-  # example nostr config. only labels: section is relevant for Traefik config
   mint:
     image: cashubtc/nutshell:0.15.3
     container_name: mint
@@ -21,8 +20,8 @@ services:
       - MINT_LISTEN_HOST=0.0.0.0
       - MINT_LISTEN_PORT=3338
       - MINT_PRIVATE_KEY=TEST_PRIVATE_KEY
-      - MINT_INFO_DESCRIPTION="This Cashu test mint has no public IP address and can only be reached via NWS powered by Nostr"
-      - MINT_INFO_NAME="Cashu NWS mint"
+      - MINT_INFO_DESCRIPTION=This Cashu test mint has no public IP address and can only be reached via NWS powered by Nostr
+      - MINT_INFO_NAME=Cashu NWS mint
     command: ["poetry", "run", "mint"]
   exit:
     build:

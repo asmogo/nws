@@ -10,10 +10,8 @@ import (
 )
 
 type ProxyConfig struct {
-	NostrRelays          []string `env:"NOSTR_RELAYS" envSeparator:";"`
-	NostrPrivateKey      string   `env:"NOSTR_PRIVATE_KEY"`
-	TargetNostrPublicKey string   `env:"TARGET_NOSTR_PUBLIC_KEY"`
-	ActualTarget         string   `env:"ACTUAL_TARGET"`
+	NostrRelays  []string `env:"NOSTR_RELAYS" envSeparator:";"`
+	ActualTarget string   `env:"ACTUAL_TARGET"`
 }
 
 type ExitConfig struct {

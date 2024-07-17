@@ -57,14 +57,13 @@ var ErrorNoServerAvailable = fmt.Errorf("no socks server available")
 // Server is reponsible for accepting connections and handling
 // the details of the SOCKS5 protocol
 type Server struct {
-	config          *Config
-	authMethods     map[uint8]Authenticator
-	nostrPrivateKey string
-	pool            *protocol.SimplePool
+	config      *Config
+	authMethods map[uint8]Authenticator
+	pool        *protocol.SimplePool
 }
 
 // New creates a new Server and potentially returns an error
-func New(conf *Config, pool *protocol.SimplePool, nostrPrivateKey string) (*Server, error) {
+func New(conf *Config, pool *protocol.SimplePool) (*Server, error) {
 	// Ensure we have at least one authentication method enabled
 	if len(conf.AuthMethods) == 0 {
 		if conf.Credentials != nil {
@@ -90,9 +89,8 @@ func New(conf *Config, pool *protocol.SimplePool, nostrPrivateKey string) (*Serv
 	}
 
 	server := &Server{
-		config:          conf,
-		nostrPrivateKey: nostrPrivateKey,
-		pool:            pool,
+		config: conf,
+		pool:   pool,
 	}
 
 	server.authMethods = make(map[uint8]Authenticator)
