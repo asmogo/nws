@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/asmogo/nws/config"
-	"github.com/asmogo/nws/gw"
+	"github.com/asmogo/nws/proxy"
 	"golang.org/x/net/context"
 )
 
@@ -16,9 +16,9 @@ func main() {
 
 	// create a new gw server
 	// and start it
-	proxy := gw.NewProxy(context.Background(), cfg)
+	socksProxy := proxy.NewProxy(context.Background(), cfg)
 
-	err = proxy.Start()
+	err = socksProxy.Start()
 	if err != nil {
 		panic(err)
 	}

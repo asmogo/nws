@@ -4,11 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/asmogo/nws/protocol"
-	"github.com/google/uuid"
-	"github.com/nbd-wtf/go-nostr"
 	"io"
-	"log/slog"
 	"net"
 	"strconv"
 	"strings"
@@ -182,48 +178,7 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	// Attempt to connect
 	dial := s.config.Dial
 	if dial == nil {
-		dial = func(ctx context.Context, net_, addr string) (net.Conn, error) {
-			addr = strings.ReplaceAll(addr, ".", "")
-			connectionID := uuid.New()
-			connection := NewConnection(ctx,
-				WithPrivateKey(s.nostrPrivateKey),
-				WithDst(addr),
-				WithSub(),
-				WithUUID(connectionID))
-			go connection.HandleSubscription()
-
-			publicKey, relays, err := ParseDestination(addr)
-			if err != nil {
-				slog.Error("error parsing host", err)
-				return nil, fmt.Errorf("error parsing host: %w", err)
-			}
-			// create nostr signed event
-			signer, err := protocol.NewEventSigner(s.nostrPrivateKey)
-			if err != nil {
-				return nil, err
-			}
-			opts := []protocol.MessageOption{
-				protocol.WithType(protocol.MessageConnect),
-				protocol.WithUUID(connectionID),
-				protocol.WithDestination(addr),
-			}
-			ev, err := signer.CreateSignedEvent(publicKey,
-				nostr.Tags{nostr.Tag{"p", publicKey}},
-				opts...)
-
-			for _, relayUrl := range relays {
-				relay, err := s.pool.EnsureRelay(relayUrl)
-				if err != nil {
-					slog.Error("error creating relay", err)
-					continue
-				}
-				err = relay.Publish(ctx, ev)
-				if err != nil {
-					return nil, err
-				}
-			}
-			return connection, nil
-		}
+		dial = DialSocks(s.pool)
 	}
 	target, err := dial(ctx, "tcp", req.realDestAddr.FQDN)
 	if err != nil {
