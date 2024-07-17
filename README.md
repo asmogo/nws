@@ -1,17 +1,35 @@
-# NoNet
+# Nostr Web Services
 
-NoNet is a nostr gateway that allows you to use nostr as a proxy to access other exit nodes.
+NWS is a nostr gateway that allows you to use nostr as a proxy to access other exit nodes.
 
 
 ## How it works
 
-The gateway is a simple http proxy. It listens on port 8881 and 8882 (socks5) and forwards requests to the configured nostr relays. 
+The gateway is a simple socks proxy. It listens on port 8882 and forwards requests to the nprofile. 
 
 ## How to use it
+You can either run the gateway and exit node on your localhost or use docker compose file. 
 ```
-curl --insecure nprofile1qqs8a8nk09fhrxylcd42haz8ev4cprhnk5egntvs0whafvaaxpk8plgpzdmhxw309akx7cmpd35x7um58gmrvd3k07smk7/v1/resource --proxy http://localhost:8881
+docker compose up -d --build
 ```
 
+When running the gateway on your localhost, you can use the following command to send a request to the nprofile:
+
+```
+curl -v -x socks5h://localhost:8882  http://nprofile1qqsp98rnlp7sn4xuf7meyec48njp2qyfch0jktwvfuqx8vdqgexkg8gpz4mhxw309ahx7um5wgkhyetvv9un5wps8qcqggauk8/v1/info --insecure
+```
+
+If the nprofile supports TLS, you can choose to connect using https scheme
+
+```
+curl -v -x socks5h://localhost:8882  https://nprofile1qqs8a8nk09fhrxylcd42haz8ev4cprhnk5egntvs0whafvaaxpk8plgpzemhxue69uhhyetvv9ujuwpnxvejuumsv93k2g6k9kr/v1/info --insecure
+```
+
+When using https, the socks5 proxy can be used as a service, since the operator of the proxy will not be able to see the request data.
+
+```
+curl -v -x socks5h://:8882  https://nprofile1qqs8a8nk09fhrxylcd42haz8ev4cprhnk5egntvs0whafvaaxpk8plgpzemhxue69uhhyetvv9ujuwpnxvejuumsv93k2g6k9kr/v1/info --insecure
+```
 ### Prerequisites
 
 - A nostr private key
@@ -48,16 +66,15 @@ Create a `.env` file in the `cmd/exit` directory with the following content:
 NOSTR_RELAYS = 'ws://localhost:6666'
 NOSTR_PRIVATE_KEY = "EXITPUBLICHEX"
 BACKEND_HOST = 'localhost:3338'
-BACKEND_SCHEME = 'http'
 ```
 
 - `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the request.
 - `NOSTR_PRIVATE_KEY`: The private key to sign the events
 - `BACKEND_HOST`: The host of the backend to forward requests to
-- `BACKEND_SCHEME`: The scheme of the backend to forward requests to
 
 Run the following command to start the exit node:
 
 ```
 go run cmd/exit/main.go
 ```
+ 
