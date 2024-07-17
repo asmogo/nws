@@ -9,7 +9,6 @@ type MessageType string
 
 var (
 	MessageTypeSocks5 = MessageType("SOCKS5")
-	MessageTypeHttp   = MessageType("HTTP")
 	MessageConnect    = MessageType("CONNECT")
 )
 

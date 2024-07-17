@@ -183,6 +183,7 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	dial := s.config.Dial
 	if dial == nil {
 		dial = func(ctx context.Context, net_, addr string) (net.Conn, error) {
+			addr = strings.ReplaceAll(addr, ".", "")
 			connectionID := uuid.New()
 			connection := NewConnection(ctx,
 				WithPrivateKey(s.nostrPrivateKey),
@@ -203,7 +204,8 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 			}
 			opts := []protocol.MessageOption{
 				protocol.WithType(protocol.MessageConnect),
-				protocol.WithUUID(connectionID), protocol.WithDestination(addr),
+				protocol.WithUUID(connectionID),
+				protocol.WithDestination(addr),
 			}
 			ev, err := signer.CreateSignedEvent(publicKey,
 				nostr.Tags{nostr.Tag{"p", publicKey}},

@@ -1,0 +1,61 @@
+version: '3'
+
+networks:
+  nostr:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:db8:a::/64
+          gateway: fd00:db8:a::1
+services:
+  # example nostr config. only labels: section is relevant for Traefik config
+  mint:
+    image: cashubtc/nutshell:0.15.3
+    container_name: mint
+    ports:
+      - "3338"
+    networks:
+      nostr:
+    environment:
+      - MINT_BACKEND_BOLT11_SAT=FakeWallet
+      - MINT_LISTEN_HOST=0.0.0.0
+      - MINT_LISTEN_PORT=3338
+      - MINT_PRIVATE_KEY=TEST_PRIVATE_KEY
+      - MINT_INFO_DESCRIPTION="This Cashu test mint has no public IP address and can only be reached via NWS powered by Nostr"
+      - MINT_INFO_NAME="Cashu NWS mint"
+    command: ["poetry", "run", "mint"]
+  exit:
+    build:
+      context: .
+      dockerfile: cmd/exit/Dockerfile
+    container_name: exit
+    networks:
+      nostr:
+    environment:
+      - NOSTR_RELAYS=ws://nostr-relay:8080
+      - NOSTR_PRIVATE_KEY=003632642b6df1bb7f150c25aae079d590e6cfcceca924304154fbc2a3a938e3
+      - BACKEND_HOST=mint:3338
+  proxy:
+    build:
+      context: .
+      dockerfile: cmd/proxy/Dockerfile
+    container_name: proxy
+    ports:
+      - 8882:8882
+    networks:
+      nostr:
+    environment:
+      - NOSTR_RELAYS=ws://nostr-relay:8080
+      - NOSTR_PRIVATE_KEY=b0aceff311951aaa014c3296f4346f91f7fd4fc17396e060acbb48d2f42ef1fe
+  nostr:
+    image: scsibug/nostr-rs-relay:latest
+    container_name: nostr-relay
+    ports:
+      - 8080:8080
+    networks:
+      nostr:
+    restart: always
+    volumes:
+      - ./nostr/data:/usr/src/app/db:Z
+      - ./nostr/config/config.toml:/usr/src/app/config.toml:ro,Z
+    user: 100:100

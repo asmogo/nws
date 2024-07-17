@@ -1,8 +1,6 @@
 package exit
 
 import (
-	"bufio"
-	"bytes"
 	"crypto/tls"
 	"fmt"
 	"github.com/asmogo/nws/config"
@@ -17,10 +15,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	_ "net/http/pprof"
-	"strconv"
-	"strings"
 )
 
 type Exit struct {
@@ -121,8 +116,6 @@ func (e *Exit) processMessage(ctx context.Context, msg protocol.IncomingEvent) {
 	switch protocolMessage.Type {
 	case protocol.MessageConnect:
 		e.handleConnect(ctx, msg, protocolMessage, false)
-	case protocol.MessageTypeHttp:
-		e.handleHttpProxyMessage(ctx, msg, protocolMessage, sharedKey)
 	case protocol.MessageTypeSocks5:
 		e.handleSocks5ProxyMessage(ctx, msg, protocolMessage, sharedKey)
 	}
@@ -173,97 +166,6 @@ func (e *Exit) handleSocks5ProxyMessage(
 		return
 	}
 	dst.WriteNostrEvent(msg)
-}
-
-// deprecated
-func (e *Exit) handleHttpProxyMessage(
-	ctx context.Context,
-	msg protocol.IncomingEvent,
-	protocolMessage *protocol.Message,
-	sharedKey []byte,
-) {
-	dst, ok := e.connectionMap.Load(protocolMessage.Key.String())
-	if !ok {
-		var err error
-		dst, err = net.Dial("tcp", e.config.BackendHost)
-		if err != nil {
-			return
-		}
-		e.connectionMap.Store(protocolMessage.Key.String(), dst)
-		go func() {
-			// Use bufio to read the response
-			reader := bufio.NewReader(dst)
-
-			// Read the status line
-			statusLine, err := reader.ReadString('\n')
-			if err != nil {
-				panic(err)
-			}
-			fmt.Println("Status Line:", statusLine)
-
-			// Read and store the headers
-			headersBuffer := &bytes.Buffer{}
-			headers := make(http.Header)
-			for {
-				line, err := reader.ReadString('\n')
-				if err != nil {
-					panic(err)
-				}
-				headersBuffer.WriteString(line)
-				if line == "\r\n" {
-					break
-				}
-				parts := strings.SplitN(line, ": ", 2)
-				if len(parts) == 2 {
-					headers.Add(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
-				}
-			}
-			fmt.Println("Headers:", headersBuffer.String())
-
-			// Read the body
-			var body bytes.Buffer
-			// calculate content length from header
-			contentLength, err := strconv.Atoi(headers.Get("Content-Length"))
-			if err != nil {
-				panic(err)
-			}
-
-			chunk := make([]byte, contentLength)
-			n, err := reader.Read(chunk)
-			body.Write(chunk[:n])
-
-			if err != nil {
-				panic(err)
-			}
-			e.publishResponse(ctx, msg, append([]byte(statusLine), append(headersBuffer.Bytes(), body.Bytes()...)...), protocolMessage)
-		}()
-	} else {
-		slog.Info("reusing connection")
-	}
-	// parse message.data to http request
-	reader := bufio.NewReader(bytes.NewReader(protocolMessage.Data))
-	request, err := http.ReadRequest(reader)
-	if err != nil {
-		slog.Error("could not parse request", "error", err)
-		return
-	}
-	request.Host = e.config.BackendHost
-	request.URL.Host = request.Host
-	request.URL.Scheme = e.config.BackendScheme
-	request.RequestURI = ""
-	request.Header.Del("Proxy-Connection")
-	// dump the request as string
-	dump, err := httputil.DumpRequest(request, true)
-	if err != nil {
-		slog.Error("could not dump request", "error", err)
-		return
-	}
-	slog.Info("sending request", "request", string(dump))
-	_, err = dst.Write(dump)
-	if err != nil {
-		slog.Error("error writing to pipe", "error", err)
-		return
-	}
 }
 
 // func (e *Exit)  messageWriter(ctx context.Context, dataChannel chan []byte, incomingMessage nostr.IncomingEvent)

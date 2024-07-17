@@ -55,7 +55,11 @@ func loadFromEnv[T any](path string) (*T, error) {
 	// load configuration from .env file
 	err := godotenv.Load()
 	if err != nil {
-		return nil, err
+		cfg, err := env.ParseAs[T]()
+		if err != nil {
+			fmt.Printf("%+v\n", err)
+		}
+		return &cfg, nil
 	}
 
 	// or you can use generics
