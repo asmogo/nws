@@ -13,7 +13,6 @@ import (
 	"github.com/samber/lo"
 	"log/slog"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -26,8 +25,6 @@ type Conn struct {
 	pool             *protocol.SimplePool
 	dst              string
 	subscriptionChan chan protocol.IncomingEvent
-	requestMap       map[string]protocol.IncomingEvent
-	once             sync.Once
 	readIds          []string
 	sentBytes        [][]byte
 	sub              bool
@@ -66,10 +63,6 @@ func NewConnection(ctx context.Context, opts ...NostrConnOption) *Conn {
 }
 
 func (nc *Conn) Read(b []byte) (n int, err error) {
-	if nc.requestMap != nil {
-		//return nc.handleRequestMapRead(b)
-	}
-
 	return nc.handleNostrRead(b, n)
 }
 
@@ -106,11 +99,6 @@ func (nc *Conn) handleNostrRead(b []byte, n int) (int, error) {
 }
 
 func (nc *Conn) Write(b []byte) (n int, err error) {
-	// in dont think we need to consider the case of requestMap here
-	// because we will always write to nostr directly
-	if nc.requestMap != nil {
-		//	return nc.handleRequestMapWrite(b)
-	}
 	return nc.handleNostrWrite(b, err)
 }
 func ParseDestination(destination string) (string, []string, error) {
