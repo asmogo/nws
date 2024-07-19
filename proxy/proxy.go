@@ -16,7 +16,7 @@ import (
 type Proxy struct {
 	config *config.ProxyConfig // the configuration for the gateway
 	// a list of nostr relays to publish events to
-	relays      []*nostr.Relay
+	relays      []*nostr.Relay // deprecated -- should be used for default relay configuration
 	pool        *protocol.SimplePool
 	socksServer *socks5.Server
 }
