@@ -1,7 +1,5 @@
 FROM golang:1.21-alpine as builder
 
-ARG DEPLOY_KEY
-
 ADD . /build/
 
 WORKDIR /build
