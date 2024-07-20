@@ -83,7 +83,7 @@ func (e *Exit) SetSubscriptions(ctx context.Context) error {
 
 func (e *Exit) handleSubscription(ctx context.Context, pubKey string, since nostr.Timestamp) error {
 	incomingEventChannel := e.pool.SubMany(ctx, e.config.NostrRelays, nostr.Filters{
-		{Kinds: []int{nostr.KindEncryptedDirectMessage},
+		{Kinds: []int{protocol.KindEphemeralEvent},
 			Since: &since,
 			Tags: nostr.TagMap{
 				"p": []string{pubKey},
@@ -176,34 +176,4 @@ func (e *Exit) handleSocks5ProxyMessage(
 		return
 	}
 	dst.WriteNostrEvent(msg)
-}
-
-// func (e *Exit)  messageWriter(ctx context.Context, dataChannel chan []byte, incomingMessage nostr.IncomingEvent)
-func (e *Exit) publishResponse(ctx context.Context, msg protocol.IncomingEvent, message []byte, receivedMessage *protocol.Message) {
-	signer, err := protocol.NewEventSigner(e.config.NostrPrivateKey)
-	if err != nil {
-		return
-	}
-	opts := []protocol.MessageOption{
-		protocol.WithUUID(receivedMessage.Key),
-		protocol.WithType(receivedMessage.Type),
-		protocol.WithData(message),
-	}
-	ev, err := signer.CreateSignedEvent(msg.PubKey, nostr.Tags{nostr.Tag{"p", msg.PubKey}}, opts...)
-	if err != nil {
-		slog.Error("could not create event", "error", err)
-		return
-	}
-	// publish the event to all relays
-	for _, responseRelay := range e.relays {
-		var relay *nostr.Relay
-		relay, err = e.pool.EnsureRelay(responseRelay.URL)
-		if err != nil {
-			return
-		}
-		err = relay.Publish(ctx, ev)
-		if err != nil {
-			return
-		}
-	}
 }
