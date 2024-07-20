@@ -1,11 +1,17 @@
 # Nostr Web Services
 
-NWS is a nostr gateway that allows you to use nostr as a proxy to access other exit nodes.
+NWS allows you to use nostr as a tcp transport layer.
 
+## System Overview
 
-## How it works
+NWS consists of two main components:
 
-The gateway is a simple socks proxy. It listens on port 8882 and forwards requests to the nprofile. 
+1. The **Entry Node**: This is a simple SOCKS proxy that listens on port 8882 and forwards requests to the NProfile.
+2. The **Exit Node**: This is a tcp proxy that listens for incoming Nostr subscriptions and forwards the payload to the
+   designated backend service.
+
+<img src="nws.png" width="900"/>
+
 
 ## How to use it
 You can either run the gateway and exit node on your localhost or use docker compose file. 
