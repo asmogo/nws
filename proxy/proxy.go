@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/netstr"
-	"github.com/asmogo/nws/protocol"
 	"github.com/asmogo/nws/socks5"
 	"github.com/nbd-wtf/go-nostr"
 	"log"
@@ -18,7 +17,7 @@ type Proxy struct {
 	config *config.ProxyConfig // the configuration for the gateway
 	// a list of nostr relays to publish events to
 	relays      []*nostr.Relay // deprecated -- should be used for default relay configuration
-	pool        *protocol.SimplePool
+	pool        *netstr.SimplePool
 	socksServer *socks5.Server
 }
 
@@ -29,7 +28,7 @@ func New(ctx context.Context, config *config.ProxyConfig) *Proxy {
 	}()
 	s := &Proxy{
 		config: config,
-		pool:   protocol.NewSimplePool(ctx),
+		pool:   netstr.NewSimplePool(ctx),
 	}
 	socksServer, err := socks5.New(&socks5.Config{
 		AuthMethods: nil,

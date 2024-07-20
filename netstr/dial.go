@@ -17,7 +17,7 @@ import (
 // It creates a signed event using the private key, public key, and destination address.
 // It ensures that the relays are available in the pool and publishes the signed event to each relay.
 // Finally, it returns the Connection and nil error. If there are any errors, nil connection and the error are returned.
-func DialSocks(pool *protocol.SimplePool) func(ctx context.Context, net_, addr string) (net.Conn, error) {
+func DialSocks(pool *SimplePool) func(ctx context.Context, net_, addr string) (net.Conn, error) {
 	return func(ctx context.Context, net_, addr string) (net.Conn, error) {
 		addr = strings.ReplaceAll(addr, ".", "")
 		connectionID := uuid.New()

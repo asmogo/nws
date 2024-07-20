@@ -1,4 +1,4 @@
-package protocol
+package netstr
 
 import (
 	"context"
