@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/asmogo/nws/config"
+	"github.com/asmogo/nws/netstr"
 	"github.com/asmogo/nws/protocol"
 	"github.com/asmogo/nws/socks5"
 	"github.com/nbd-wtf/go-nostr"
@@ -22,7 +23,7 @@ import (
 type Exit struct {
 
 	// pool represents a pool of relays and manages the subscription to incoming events from relays.
-	pool *protocol.SimplePool
+	pool *netstr.SimplePool
 
 	// config is a field in the Exit struct that holds information related to exit node configuration.
 	config *config.ExitConfig
@@ -33,13 +34,13 @@ type Exit struct {
 
 	// nostrConnectionMap is a concurrent map used to store connections for the Exit node.
 	// It is used to establish and maintain connections between the Exit node and the backend host.
-	nostrConnectionMap *xsync.MapOf[string, *socks5.Conn]
+	nostrConnectionMap *xsync.MapOf[string, *netstr.NostrConnection]
 
 	// mutexMap is a field in the Exit struct that represents a map used for synchronizing access to resources based on a string key.
 	mutexMap *MutexMap
 
 	// incomingChannel represents a channel used to receive incoming events from relays.
-	incomingChannel chan protocol.IncomingEvent
+	incomingChannel chan netstr.IncomingEvent
 }
 
 // NewExit creates a new Exit node with the provided context and config.
@@ -48,10 +49,10 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-	pool := protocol.NewSimplePool(ctx)
+	pool := netstr.NewSimplePool(ctx)
 
 	exit := &Exit{
-		nostrConnectionMap: xsync.NewMapOf[string, *socks5.Conn](),
+		nostrConnectionMap: xsync.NewMapOf[string, *netstr.NostrConnection](),
 		config:             config,
 		pool:               pool,
 		mutexMap:           NewMutexMap(),
@@ -138,7 +139,7 @@ func (e *Exit) ListenAndServe(ctx context.Context) {
 
 // processMessage decrypts and unmarshals the incoming event message, and then
 // routes the message to the appropriate handler based on its protocol type.
-func (e *Exit) processMessage(ctx context.Context, msg protocol.IncomingEvent) {
+func (e *Exit) processMessage(ctx context.Context, msg netstr.IncomingEvent) {
 	sharedKey, err := nip04.ComputeSharedSecret(msg.PubKey, e.config.NostrPrivateKey)
 	if err != nil {
 		return
@@ -167,18 +168,18 @@ func (e *Exit) processMessage(ctx context.Context, msg protocol.IncomingEvent) {
 // If the connection cannot be established, it logs an error and returns.
 // It then stores the connection in the nostrConnectionMap and creates two goroutines
 // to proxy the data between the connection and the backend.
-func (e *Exit) handleConnect(ctx context.Context, msg protocol.IncomingEvent, protocolMessage *protocol.Message, isTLS bool) {
+func (e *Exit) handleConnect(ctx context.Context, msg netstr.IncomingEvent, protocolMessage *protocol.Message, isTLS bool) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
 	receiver, err := nip19.EncodeProfile(msg.PubKey, []string{msg.Relay.String()})
 	if err != nil {
 		return
 	}
-	connection := socks5.NewConnection(
+	connection := netstr.NewConnection(
 		ctx,
-		socks5.WithPrivateKey(e.config.NostrPrivateKey),
-		socks5.WithDst(receiver),
-		socks5.WithUUID(protocolMessage.Key),
+		netstr.WithPrivateKey(e.config.NostrPrivateKey),
+		netstr.WithDst(receiver),
+		netstr.WithUUID(protocolMessage.Key),
 	)
 	var dst net.Conn
 	if isTLS {
@@ -205,7 +206,7 @@ func (e *Exit) handleConnect(ctx context.Context, msg protocol.IncomingEvent, pr
 // - msg: The incoming event containing the SOCKS5 proxy message.
 // - protocolMessage: The protocol message associated with the incoming event.
 func (e *Exit) handleSocks5ProxyMessage(
-	msg protocol.IncomingEvent,
+	msg netstr.IncomingEvent,
 	protocolMessage *protocol.Message,
 ) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
