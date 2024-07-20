@@ -20,12 +20,26 @@ import (
 
 // Exit represents a structure that holds information related to an exit node.
 type Exit struct {
-	pool               *protocol.SimplePool
-	config             *config.ExitConfig
-	relays             []*nostr.Relay
+
+	// pool represents a pool of relays and manages the subscription to incoming events from relays.
+	pool *protocol.SimplePool
+
+	// config is a field in the Exit struct that holds information related to exit node configuration.
+	config *config.ExitConfig
+
+	// relays represents a slice of *nostr.Relay, which contains information about the relay nodes used by the Exit node.
+	// Todo -- check if this is deprecated
+	relays []*nostr.Relay
+
+	// nostrConnectionMap is a concurrent map used to store connections for the Exit node.
+	// It is used to establish and maintain connections between the Exit node and the backend host.
 	nostrConnectionMap *xsync.MapOf[string, *socks5.Conn]
-	mutexMap           *MutexMap
-	incomingChannel    chan protocol.IncomingEvent
+
+	// mutexMap is a field in the Exit struct that represents a map used for synchronizing access to resources based on a string key.
+	mutexMap *MutexMap
+
+	// incomingChannel represents a channel used to receive incoming events from relays.
+	incomingChannel chan protocol.IncomingEvent
 }
 
 // NewExit creates a new Exit node with the provided context and config.
@@ -62,30 +76,31 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 		panic(err)
 	}
 	slog.Info("created exit node", "profile", profile)
-
+	err = exit.setSubscriptions(ctx)
+	if err != nil {
+		panic(err)
+	}
 	return exit
 }
 
-// SetSubscriptions sets up subscriptions for the Exit node to receive incoming events from the specified relays.
+// setSubscriptions sets up subscriptions for the Exit node to receive incoming events from the specified relays.
 // It first obtains the public key using the configured Nostr private key.
 // Then it calls the `handleSubscription` method to open a subscription to the relays with the specified filters.
 // This method runs in a separate goroutine and continuously handles the incoming events by calling the `processMessage` method.
 // If the context is canceled before the subscription is established, it returns the context error.
 // If any errors occur during the process, they are returned.
 // This method should be called once when starting the Exit node.
-func (e *Exit) SetSubscriptions(ctx context.Context) error {
+func (e *Exit) setSubscriptions(ctx context.Context) error {
 	pubKey, err := nostr.GetPublicKey(e.config.NostrPrivateKey)
 	if err != nil {
 		return err
 	}
 	now := nostr.Now()
-	if err := e.handleSubscription(ctx, pubKey, now); err != nil {
+	if err = e.handleSubscription(ctx, pubKey, now); err != nil {
 		return err
 	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return nil
+
 }
 
 // handleSubscription handles the subscription to incoming events from relays based on the provided filters.
@@ -100,17 +115,16 @@ func (e *Exit) handleSubscription(ctx context.Context, pubKey string, since nost
 			}},
 	})
 	e.incomingChannel = incomingEventChannel
-	go e.handleEvents(ctx, incomingEventChannel)
 	return nil
 }
 
-// handleEvents handles incoming events from the subscription channel.
+// ListenAndServe handles incoming events from the subscription channel.
 // It processes each event by calling the processMessage method, as long as the event is not nil.
 // If the context is canceled (ctx.Done() receives a value), the method returns.
-func (e *Exit) handleEvents(ctx context.Context, subscription chan protocol.IncomingEvent) {
+func (e *Exit) ListenAndServe(ctx context.Context) {
 	for {
 		select {
-		case event := <-subscription:
+		case event := <-e.incomingChannel:
 			slog.Debug("received event", "event", event)
 			if event.Relay == nil {
 				continue
