@@ -19,8 +19,5 @@ func main() {
 	// and start it
 	ctx := context.Background()
 	exitNode := exit.NewExit(ctx, cfg)
-	err = exitNode.SetSubscriptions(ctx)
-	if err != nil {
-		panic(err)
-	}
+	exitNode.ListenAndServe(ctx)
 }
