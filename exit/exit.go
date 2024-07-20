@@ -52,6 +52,16 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 		exit.relays = append(exit.relays, relay)
 		fmt.Printf("added relay connection to %s\n", relayUrl)
 	}
+	pubKey, err := nostr.GetPublicKey(config.NostrPrivateKey)
+	if err != nil {
+		panic(err)
+	}
+	profile, err := nip19.EncodeProfile(pubKey,
+		config.NostrRelays)
+	if err != nil {
+		panic(err)
+	}
+	slog.Info("created exit node", "profile", profile)
 
 	return exit
 }
