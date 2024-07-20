@@ -21,7 +21,6 @@ func DialSocks(pool *protocol.SimplePool) func(ctx context.Context, net_, addr s
 			WithDst(addr),
 			WithSub(),
 			WithUUID(connectionID))
-		go connection.HandleSubscription()
 
 		publicKey, relays, err := ParseDestination(addr)
 		if err != nil {
