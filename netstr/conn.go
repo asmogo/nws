@@ -1,4 +1,4 @@
-package socks5
+package netstr
 
 import (
 	"bytes"
@@ -16,15 +16,18 @@ import (
 	"time"
 )
 
-type Conn struct {
-	// uuid is a field of type uuid.UUID in the Conn struct.
+// NostrConnection implements the net.Conn interface.
+// It is used to establish a connection to Nostr relays.
+// It provides methods for reading and writing data.
+type NostrConnection struct {
+	// uuid is a field of type uuid.UUID in the NostrConnection struct.
 	uuid uuid.UUID
-	// ctx is a field of type context.Context in the Conn struct.
+	// ctx is a field of type context.Context in the NostrConnection struct.
 	ctx context.Context
-	// cancel is a field of type context.CancelFunc in the Conn struct.
+	// cancel is a field of type context.CancelFunc in the NostrConnection struct.
 	cancel context.CancelFunc
 
-	// readBuffer is a field of type `bytes.Buffer` in the `Conn` struct.
+	// readBuffer is a field of type `bytes.Buffer` in the `NostrConnection` struct.
 	// It is used to store the decrypted message from incoming events.
 	// The `handleSubscription` method continuously listens for events on the subscription channel,
 	// decrypts the event content, and writes the decrypted message to the `readBuffer`.
@@ -33,7 +36,7 @@ type Conn struct {
 	// private key of the connection
 	privateKey string
 
-	// Conn represents a connection object.
+	// NostrConnection represents a connection object.
 	pool *protocol.SimplePool
 
 	// dst is a field that represents the destination address for the Nostr connection configuration.
@@ -43,10 +46,10 @@ type Conn struct {
 	// It is used to write incoming events which will be read and processed by the Read method.
 	subscriptionChan chan protocol.IncomingEvent
 
-	// readIds represents the list of event IDs that have been read by the Conn object.
+	// readIds represents the list of event IDs that have been read by the NostrConnection object.
 	readIds []string
 
-	// writeIds is a field of type []string in the Conn struct.
+	// writeIds is a field of type []string in the NostrConnection struct.
 	// It stores the IDs of the events that have been written to the connection.
 	// This field is used to check if an event has already been written and avoid duplicate writes.
 	writeIds []string
@@ -58,23 +61,23 @@ type Conn struct {
 	sub bool
 }
 
-// WriteNostrEvent writes the incoming event to the subscription channel of the Conn.
+// WriteNostrEvent writes the incoming event to the subscription channel of the NostrConnection.
 // The subscription channel is used by the Read method to read events and handle them.
 // Parameters:
 // - event: The incoming event to be written to the subscription channel.
-func (nc *Conn) WriteNostrEvent(event protocol.IncomingEvent) {
+func (nc *NostrConnection) WriteNostrEvent(event protocol.IncomingEvent) {
 	nc.subscriptionChan <- event
 }
 
-// NewConnection creates a new Conn object with the provided context and options.
+// NewConnection creates a new NostrConnection object with the provided context and options.
 // It initializes the config with default values, processes the options to customize the config,
-// and creates a new Conn object using the config.
-// The Conn object includes the privateKey, dst, pool, ctx, cancel, sub, subscriptionChan, readIds, and sentBytes fields.
-// If a uuid is provided in the options, it is assigned to the Conn object.
-// The Conn object is then returned.
-func NewConnection(ctx context.Context, opts ...NostrConnOption) *Conn {
+// and creates a new NostrConnection object using the config.
+// The NostrConnection object includes the privateKey, dst, pool, ctx, cancel, sub, subscriptionChan, readIds, and sentBytes fields.
+// If an uuid is provided in the options, it is assigned to the NostrConnection object.
+// The NostrConnection object is then returned.
+func NewConnection(ctx context.Context, opts ...NostrConnOption) *NostrConnection {
 	ctx, c := context.WithCancel(ctx)
-	nostrConnection := &Conn{
+	nostrConnection := &NostrConnection{
 		pool:             protocol.NewSimplePool(ctx),
 		ctx:              ctx,
 		cancel:           c,
@@ -94,15 +97,8 @@ func NewConnection(ctx context.Context, opts ...NostrConnOption) *Conn {
 // If the context is canceled before data is received, Read returns an error.
 //
 // The number of bytes read is returned as n and any error encountered is returned as err.
-// If err is non-nil, it will be of type fmt.Errorf.
-//
-// If the event received is a Nostr event, it decrypts the content using the shared secret
-// computed from the event's public key and the connection's private key.
-// The decrypted message is then unmarshaled using the protocol.UnmarshalJSON function.
-//
 // The content of the decrypted message is then copied to the provided byte slice b.
-// The number of bytes copied is limited by the length of b.
-func (nc *Conn) Read(b []byte) (n int, err error) {
+func (nc *NostrConnection) Read(b []byte) (n int, err error) {
 	return nc.handleNostrRead(b, n)
 }
 
@@ -111,7 +107,7 @@ func (nc *Conn) Read(b []byte) (n int, err error) {
 // unmarshals the decoded message and copies the content into the provided byte slice.
 // It returns the number of bytes copied and any error encountered.
 // If the context is canceled, it returns an error with "context canceled" message.
-func (nc *Conn) handleNostrRead(b []byte, n int) (int, error) {
+func (nc *NostrConnection) handleNostrRead(b []byte, n int) (int, error) {
 	for {
 		select {
 		case event := <-nc.subscriptionChan:
@@ -149,7 +145,7 @@ func (nc *Conn) handleNostrRead(b []byte, n int) (int, error) {
 // Write writes data to the connection.
 // It delegates the writing logic to handleNostrWrite method.
 // The number of bytes written and error (if any) are returned.
-func (nc *Conn) Write(b []byte) (n int, err error) {
+func (nc *NostrConnection) Write(b []byte) (n int, err error) {
 	return nc.handleNostrWrite(b, err)
 }
 
@@ -158,7 +154,7 @@ func (nc *Conn) Write(b []byte) (n int, err error) {
 // creates a message signer, creates message options, signs the event,
 // publishes the event to relays, and appends the sent bytes to the connection's sentBytes array.
 // The method returns the number of bytes written and any error that occurred.
-func (nc *Conn) handleNostrWrite(b []byte, err error) (int, error) {
+func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
 	// check if we have already sent this event
 
 	publicKey, relays, err := ParseDestination(nc.dst)
@@ -241,37 +237,37 @@ func ParseDestination(destination string) (string, []string, error) {
 	return publicKey, relays, nil
 }
 
-func (nc *Conn) Close() error {
+func (nc *NostrConnection) Close() error {
 	nc.cancel()
 	return nil
 }
 
-func (nc *Conn) LocalAddr() net.Addr {
+func (nc *NostrConnection) LocalAddr() net.Addr {
 	return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9333}
 }
 
-func (nc *Conn) RemoteAddr() net.Addr {
+func (nc *NostrConnection) RemoteAddr() net.Addr {
 	return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0}
 }
 
-func (nc *Conn) SetDeadline(t time.Time) error {
+func (nc *NostrConnection) SetDeadline(t time.Time) error {
 	return nil
 }
 
-func (nc *Conn) SetReadDeadline(t time.Time) error {
+func (nc *NostrConnection) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
-func (nc *Conn) SetWriteDeadline(t time.Time) error {
+func (nc *NostrConnection) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
 // NostrConnOption is a functional option type for configuring NostrConnConfig.
-type NostrConnOption func(*Conn)
+type NostrConnOption func(*NostrConnection)
 
 // WithPrivateKey sets the private key for the NostrConnConfig.
 func WithPrivateKey(privateKey string) NostrConnOption {
-	return func(config *Conn) {
+	return func(config *NostrConnection) {
 		config.privateKey = privateKey
 	}
 }
@@ -280,7 +276,7 @@ func WithPrivateKey(privateKey string) NostrConnOption {
 // to a NostrConnConfig, it sets the 'sub' field to true, indicating that
 // the connection will handle subscriptions.
 func WithSub(...bool) NostrConnOption {
-	return func(connection *Conn) {
+	return func(connection *NostrConnection) {
 		connection.sub = true
 		go connection.handleSubscription()
 	}
@@ -289,7 +285,7 @@ func WithSub(...bool) NostrConnOption {
 // WithDst is a NostrConnOption function that sets the destination address for the Nostr connection configuration.
 // It takes a string parameter `dst` and updates the `config.dst` field accordingly.
 func WithDst(dst string) NostrConnOption {
-	return func(connection *Conn) {
+	return func(connection *NostrConnection) {
 		connection.dst = dst
 	}
 }
@@ -297,7 +293,7 @@ func WithDst(dst string) NostrConnOption {
 // WithUUID sets the UUID option for creating a NostrConnConfig.
 // It assigns the provided UUID to the config's uuid field.
 func WithUUID(uuid uuid.UUID) NostrConnOption {
-	return func(connection *Conn) {
+	return func(connection *NostrConnection) {
 		connection.uuid = uuid
 	}
 }
@@ -307,7 +303,7 @@ func WithUUID(uuid uuid.UUID) NostrConnOption {
 // If the event has a valid relay, it computes the shared key and decrypts the event content.
 // The decrypted message is then written to the read buffer.
 // If the context is canceled, the method returns.
-func (nc *Conn) handleSubscription() {
+func (nc *NostrConnection) handleSubscription() {
 	for {
 		select {
 		case event := <-nc.subscriptionChan:

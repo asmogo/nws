@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/asmogo/nws/netstr"
 	"io"
 	"net"
 	"strconv"
@@ -178,7 +179,7 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	// Attempt to connect
 	dial := s.config.Dial
 	if dial == nil {
-		dial = DialSocks(s.pool)
+		dial = netstr.DialSocks(s.pool)
 	}
 	target, err := dial(ctx, "tcp", req.realDestAddr.FQDN)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/asmogo/nws/config"
+	"github.com/asmogo/nws/netstr"
 	"github.com/asmogo/nws/protocol"
 	"github.com/asmogo/nws/socks5"
 	"github.com/nbd-wtf/go-nostr"
@@ -33,7 +34,7 @@ type Exit struct {
 
 	// nostrConnectionMap is a concurrent map used to store connections for the Exit node.
 	// It is used to establish and maintain connections between the Exit node and the backend host.
-	nostrConnectionMap *xsync.MapOf[string, *socks5.Conn]
+	nostrConnectionMap *xsync.MapOf[string, *netstr.NostrConnection]
 
 	// mutexMap is a field in the Exit struct that represents a map used for synchronizing access to resources based on a string key.
 	mutexMap *MutexMap
@@ -51,7 +52,7 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 	pool := protocol.NewSimplePool(ctx)
 
 	exit := &Exit{
-		nostrConnectionMap: xsync.NewMapOf[string, *socks5.Conn](),
+		nostrConnectionMap: xsync.NewMapOf[string, *netstr.NostrConnection](),
 		config:             config,
 		pool:               pool,
 		mutexMap:           NewMutexMap(),
@@ -174,11 +175,11 @@ func (e *Exit) handleConnect(ctx context.Context, msg protocol.IncomingEvent, pr
 	if err != nil {
 		return
 	}
-	connection := socks5.NewConnection(
+	connection := netstr.NewConnection(
 		ctx,
-		socks5.WithPrivateKey(e.config.NostrPrivateKey),
-		socks5.WithDst(receiver),
-		socks5.WithUUID(protocolMessage.Key),
+		netstr.WithPrivateKey(e.config.NostrPrivateKey),
+		netstr.WithDst(receiver),
+		netstr.WithUUID(protocolMessage.Key),
 	)
 	var dst net.Conn
 	if isTLS {

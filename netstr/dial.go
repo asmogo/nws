@@ -1,4 +1,4 @@
-package socks5
+package netstr
 
 import (
 	"context"
@@ -11,6 +11,12 @@ import (
 	"strings"
 )
 
+// DialSocks connects to a destination using the provided SimplePool and returns a Dialer function.
+// It creates a new Connection using the specified context, private key, destination address, subscription flag, and connectionID.
+// It parses the destination address to get the public key and relays.
+// It creates a signed event using the private key, public key, and destination address.
+// It ensures that the relays are available in the pool and publishes the signed event to each relay.
+// Finally, it returns the Connection and nil error. If there are any errors, nil connection and the error are returned.
 func DialSocks(pool *protocol.SimplePool) func(ctx context.Context, net_, addr string) (net.Conn, error) {
 	return func(ctx context.Context, net_, addr string) (net.Conn, error) {
 		addr = strings.ReplaceAll(addr, ".", "")

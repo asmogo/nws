@@ -16,7 +16,7 @@ func main() {
 
 	// create a new gw server
 	// and start it
-	socksProxy := proxy.NewProxy(context.Background(), cfg)
+	socksProxy := proxy.New(context.Background(), cfg)
 
 	err = socksProxy.Start()
 	if err != nil {
