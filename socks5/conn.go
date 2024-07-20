@@ -153,9 +153,9 @@ func (nc *Conn) handleNostrWrite(b []byte, err error) (int, error) {
 	if nc.sub {
 		nc.sub = false
 		now := nostr.Now()
-		incomingEventChannel := nc.pool.SubMany(context.Background(), relays,
+		incomingEventChannel := nc.pool.SubMany(nc.ctx, relays,
 			nostr.Filters{
-				{Kinds: []int{nostr.KindEncryptedDirectMessage},
+				{Kinds: []int{protocol.KindEphemeralEvent},
 					Authors: []string{publicKey},
 					Since:   &now,
 					Tags: nostr.TagMap{

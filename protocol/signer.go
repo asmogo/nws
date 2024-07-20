@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const KindEphemeralEvent int = 38333
+
 type EventSigner struct {
 	PublicKey  string
 	privateKey string
@@ -37,7 +39,7 @@ func (s *EventSigner) CreateEvent(tags nostr.Tags) nostr.Event {
 	return nostr.Event{
 		PubKey:    s.PublicKey,
 		CreatedAt: nostr.Now(),
-		Kind:      nostr.KindEncryptedDirectMessage,
+		Kind:      KindEphemeralEvent,
 		Tags:      tags,
 	}
 }
