@@ -1,20 +1,29 @@
 # Nostr Web Services
 
-NWS allows you to use nostr as a tcp transport layer.
+Nostr Web Services (NWS) replaces the IP layer in TCP transport using Nostr, enabling a secure and efficient connection between clients and backend services.
+
 
 ## System Overview
 
 NWS consists of two main components:
 
 1. The **Entry Node**: This is a simple SOCKS proxy that listens on port 8882 and forwards requests to the NProfile.
-2. The **Exit Node**: This is a tcp proxy that listens for incoming Nostr subscriptions and forwards the payload to the
+2. The **Exit Node**: This is a TCP proxy that listens for incoming Nostr subscriptions and forwards the payload to the
    designated backend service.
 
 <img src="nws.png" width="900"/>
 
 
 ## How to use it
-You can either run the gateway and exit node on your localhost or use docker compose file. 
+You can run the gateway and exit node either on your localhost or using a Docker Compose file.
+
+
+### Using Docker Compose
+To set up using Docker Compose, run:
+
+### Sending Requests via the Gateway
+To send a request to the NProfile using the gateway running on your localhost, use:
+
 ```
 docker compose up -d --build
 ```
