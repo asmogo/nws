@@ -29,6 +29,7 @@ type Conn struct {
 	requestMap       map[string]protocol.IncomingEvent
 	once             sync.Once
 	readIds          []string
+	writeIds         []string
 	sentBytes        [][]byte
 	sub              bool
 }
@@ -45,7 +46,7 @@ func NewConnection(ctx context.Context, opts ...NostrConnOption) *Conn {
 	for _, opt := range opts {
 		opt(config)
 	}
-	ctx, c := context.WithTimeout(ctx, time.Second*10)
+	ctx, c := context.WithCancel(ctx)
 	nostrConnection := &Conn{
 		privateKey:       config.privateKey,
 		dst:              config.dst,
@@ -136,11 +137,7 @@ func ParseDestination(destination string) (string, []string, error) {
 }
 func (nc *Conn) handleNostrWrite(b []byte, err error) (int, error) {
 	// check if we have already sent this event
-	for _, sent := range nc.sentBytes {
-		if bytes.Equal(sent, b) {
-			return 0, nil
-		}
-	}
+
 	publicKey, relays, err := ParseDestination(nc.dst)
 	if err != nil {
 		return 0, err
@@ -159,7 +156,14 @@ func (nc *Conn) handleNostrWrite(b []byte, err error) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	if lo.Contains(nc.writeIds, ev.ID) {
+		slog.Info("event already sent", slog.String("event", ev.ID))
+		return 0, nil
+	}
+	nc.writeIds = append(nc.writeIds, ev.ID)
+
 	if nc.sub {
+		nc.sub = false
 		now := nostr.Now()
 		incomingEventChannel := nc.pool.SubMany(context.Background(), relays,
 			nostr.Filters{
