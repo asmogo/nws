@@ -37,14 +37,14 @@ type NostrConnection struct {
 	privateKey string
 
 	// NostrConnection represents a connection object.
-	pool *SimplePool
+	pool *nostr.SimplePool
 
 	// dst is a field that represents the destination address for the Nostr connection configuration.
 	dst string
 
 	// subscriptionChan is a channel of type protocol.IncomingEvent.
 	// It is used to write incoming events which will be read and processed by the Read method.
-	subscriptionChan chan IncomingEvent
+	subscriptionChan chan nostr.IncomingEvent
 
 	// readIds represents the list of event IDs that have been read by the NostrConnection object.
 	readIds []string
@@ -65,7 +65,7 @@ type NostrConnection struct {
 // The subscription channel is used by the Read method to read events and handle them.
 // Parameters:
 // - event: The incoming event to be written to the subscription channel.
-func (nc *NostrConnection) WriteNostrEvent(event IncomingEvent) {
+func (nc *NostrConnection) WriteNostrEvent(event nostr.IncomingEvent) {
 	nc.subscriptionChan <- event
 }
 
@@ -78,10 +78,10 @@ func (nc *NostrConnection) WriteNostrEvent(event IncomingEvent) {
 func NewConnection(ctx context.Context, opts ...NostrConnOption) *NostrConnection {
 	ctx, c := context.WithCancel(ctx)
 	nostrConnection := &NostrConnection{
-		pool:             NewSimplePool(ctx),
+		pool:             nostr.NewSimplePool(ctx),
 		ctx:              ctx,
 		cancel:           c,
-		subscriptionChan: make(chan IncomingEvent),
+		subscriptionChan: make(chan nostr.IncomingEvent),
 		readIds:          make([]string, 0),
 		sentBytes:        make([][]byte, 0),
 	}

@@ -23,7 +23,7 @@ import (
 type Exit struct {
 
 	// pool represents a pool of relays and manages the subscription to incoming events from relays.
-	pool *netstr.SimplePool
+	pool *nostr.SimplePool
 
 	// config is a field in the Exit struct that holds information related to exit node configuration.
 	config *config.ExitConfig
@@ -40,7 +40,7 @@ type Exit struct {
 	mutexMap *MutexMap
 
 	// incomingChannel represents a channel used to receive incoming events from relays.
-	incomingChannel chan netstr.IncomingEvent
+	incomingChannel chan nostr.IncomingEvent
 }
 
 // NewExit creates a new Exit node with the provided context and config.
@@ -49,7 +49,7 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-	pool := netstr.NewSimplePool(ctx)
+	pool := nostr.NewSimplePool(ctx)
 
 	exit := &Exit{
 		nostrConnectionMap: xsync.NewMapOf[string, *netstr.NostrConnection](),
@@ -139,7 +139,7 @@ func (e *Exit) ListenAndServe(ctx context.Context) {
 
 // processMessage decrypts and unmarshals the incoming event message, and then
 // routes the message to the appropriate handler based on its protocol type.
-func (e *Exit) processMessage(ctx context.Context, msg netstr.IncomingEvent) {
+func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 	sharedKey, err := nip04.ComputeSharedSecret(msg.PubKey, e.config.NostrPrivateKey)
 	if err != nil {
 		return
@@ -168,7 +168,7 @@ func (e *Exit) processMessage(ctx context.Context, msg netstr.IncomingEvent) {
 // If the connection cannot be established, it logs an error and returns.
 // It then stores the connection in the nostrConnectionMap and creates two goroutines
 // to proxy the data between the connection and the backend.
-func (e *Exit) handleConnect(ctx context.Context, msg netstr.IncomingEvent, protocolMessage *protocol.Message, isTLS bool) {
+func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, protocolMessage *protocol.Message, isTLS bool) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
 	receiver, err := nip19.EncodeProfile(msg.PubKey, []string{msg.Relay.String()})
@@ -206,7 +206,7 @@ func (e *Exit) handleConnect(ctx context.Context, msg netstr.IncomingEvent, prot
 // - msg: The incoming event containing the SOCKS5 proxy message.
 // - protocolMessage: The protocol message associated with the incoming event.
 func (e *Exit) handleSocks5ProxyMessage(
-	msg netstr.IncomingEvent,
+	msg nostr.IncomingEvent,
 	protocolMessage *protocol.Message,
 ) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
