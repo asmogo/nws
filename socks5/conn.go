@@ -88,6 +88,9 @@ func (nc *Conn) handleNostrRead(b []byte, n int) (int, error) {
 				return 0, err
 			}
 			message, err := protocol.UnmarshalJSON([]byte(decodedMessage))
+			if err != nil {
+				return 0, err
+			}
 			slog.Info("reading", slog.String("event", event.ID), slog.String("content", base64.StdEncoding.EncodeToString(message.Data)))
 			n = copy(b, message.Data)
 			return n, nil
