@@ -17,7 +17,7 @@ type Proxy struct {
 	config *config.ProxyConfig // the configuration for the gateway
 	// a list of nostr relays to publish events to
 	relays      []*nostr.Relay // deprecated -- should be used for default relay configuration
-	pool        *netstr.SimplePool
+	pool        *nostr.SimplePool
 	socksServer *socks5.Server
 }
 
@@ -28,7 +28,7 @@ func New(ctx context.Context, config *config.ProxyConfig) *Proxy {
 	}()
 	s := &Proxy{
 		config: config,
-		pool:   netstr.NewSimplePool(ctx),
+		pool:   nostr.NewSimplePool(ctx),
 	}
 	socksServer, err := socks5.New(&socks5.Config{
 		AuthMethods: nil,

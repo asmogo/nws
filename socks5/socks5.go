@@ -3,7 +3,7 @@ package socks5
 import (
 	"bufio"
 	"fmt"
-	"github.com/asmogo/nws/netstr"
+	"github.com/nbd-wtf/go-nostr"
 	"log"
 	"net"
 	"os"
@@ -58,11 +58,11 @@ var ErrorNoServerAvailable = fmt.Errorf("no socks server available")
 type Server struct {
 	config      *Config
 	authMethods map[uint8]Authenticator
-	pool        *netstr.SimplePool
+	pool        *nostr.SimplePool
 }
 
 // New creates a new Server and potentially returns an error
-func New(conf *Config, pool *netstr.SimplePool) (*Server, error) {
+func New(conf *Config, pool *nostr.SimplePool) (*Server, error) {
 	// Ensure we have at least one authentication method enabled
 	if len(conf.AuthMethods) == 0 {
 		if conf.Credentials != nil {
