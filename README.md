@@ -25,7 +25,7 @@ The exit node utilizes the private key and relay list to generate an [nprofile](
 ## Quickstart
 
 Running NWS using Docker is recommended. For instructions on running NWS on your local machine, refer to the [Build from source](#build-from-source) section.
-__
+
 ### Using Docker Compose
 
 To set up using Docker Compose, run the following command:
