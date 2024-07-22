@@ -11,21 +11,21 @@ Exit nodes are reachable through their [nprofiles](https://nostr-nips.com/nip-19
 - A list of Nostr relays that the exit node is connected to.
 - The Nostr private key of the exit node.
 
-The exit node utilizes the private key and relay list to generate an [nprofile](https://nostr-nips.com/nip-19), which gets printed to the console on startup.
+The exit node utilizes the private key and relay list to generate an [nprofile](https://nostr-nips.com/nip-19), which is printed in the console on startup.
 
 ## Overview
 
-NWS main components:
+### NWS main components:
 
-1. **Entry Node**: It forwards tcp packets to the exit node using a SOCKS proxy and creates encrypted events for the public key of the exit node.
-2. **Exit Node**: It is a TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to the designated backend service.
+1. **Entry node**: It forwards tcp packets to the exit node using a SOCKS proxy and creates encrypted events for the public key of the exit node.
+2. **Exit node**: It is a TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to the designated backend service.
 
 <img src="nws.png" width="900"/>
 
 ## Quickstart
 
 Running NWS using Docker is recommended. For instructions on running NWS on your local machine, refer to the [Build from source](#build-from-source) section.
-
+__
 ### Using Docker Compose
 
 To set up using Docker Compose, run the following command:
@@ -35,7 +35,7 @@ docker compose up -d --build
 
 This will start an example setup, including the entry node, exit node, and a backend service.
 
-### Sending Requests to the Entry Node
+### Sending Requests to the Entry node
 
 You can use the following command to send a request to the nprofile:
 
@@ -57,10 +57,11 @@ The exit node must be set up to make the services reachable via Nostr.
 
 ### Configuration
 
-Configuration can be completed using environment variables or through the `.env` file created in the current working directory with the following content:
+Configuration can be completed using environment variables.
+Alternatively, you can create a `.env` file in the current working directory with the following content:
 ```
-NOSTR_RELAYS = 'ws://localhost:6666'
-NOSTR_PRIVATE_KEY = "EXITPUBLICHEX"
+NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.damus.io'
+NOSTR_PRIVATE_KEY = "EXITPRIVATEHEX"
 BACKEND_HOST = 'localhost:3338'
 ```
 
@@ -84,12 +85,13 @@ To run an entry node for accessing NWS services behind exit nodes, use the follo
 go run cmd/proxy/main.go
 ```
 
-#### Entry Node Configuration
+#### Entry node Configuration
 
 If you used environment variables, no further configuration is needed.
 For `.env` file configurations, do so in the current working directory with the following content:
 
 ```
-NOSTR_RELAYS = 'ws://localhost:6666'
+NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.damus.io'
 ```
+
 Here, NOSTR_RELAYS is a list of nostr relays to publish events to and will only be used if there was no nprofile in the request.
