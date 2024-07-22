@@ -1,51 +1,41 @@
 # Nostr Web Services (NWS)
 
----
-Nostr Web Services (NWS) replaces the IP layer in TCP transport using Nostr, enabling a secure connection between
+
+NWS replaces the IP layer in TCP transport using Nostr, enabling a secure connection between
 clients and backend services.
+
+Exit nodes are reachable through their [nprofiles](https://nostr-nips.com/nip-19), which are combinations of a Nostr public key and multiple relays.
 
 ### Prerequisites
 
-Exit nodes are reachable using their [nprofile](https://nostr-nips.com/nip-19). The nprofile is a composition of a nostr
-public key and multiple relays.
+- A list of Nostr relays that the exit node is connected to.
+- The Nostr private key of the exit node.
 
-- A list of nostr relays, that the exit node is connected to.
-- The nostr private key (for the exit node).
-
-Using this private key and the relay list, the exit node will generate a [nprofile](https://nostr-nips.com/nip-19) and
-print it to the console on startup.
+The exit node utilizes the private key and relay list to generate an [nprofile](https://nostr-nips.com/nip-19), which gets printed to the console on startup.
 
 ## Overview
 
----
-NWS consists of two main components:
+NWS main components:
 
-1. The **Entry Node** is used to forward tcp packets to the exit node using a SOCKS proxy. It creates encrypted events
-   for the public key of the exit node.
-2. The **Exit Node** is a TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to
-   the
-   designated backend service.
+1. **Entry Node**: It forwards tcp packets to the exit node using a SOCKS proxy and creates encrypted events for the public key of the exit node.
+2. **Exit Node**: It is a TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to the designated backend service.
 
 <img src="nws.png" width="900"/>
 
 ## Quickstart
 
----
-It is recommended to run NWS using docker.
-
-There are instructions for running NWS on your local machine in the [Build from source](#build-from-source) section.
+Running NWS using Docker is recommended. For instructions on running NWS on your local machine, refer to the [Build from source](#build-from-source) section.
 
 ### Using Docker Compose
 
-To set up using Docker Compose, run:
-
+To set up using Docker Compose, run the following command:
 ```
 docker compose up -d --build
 ```
 
-This command will start an example setup including the entry node, exit node and a backend service.
+This will start an example setup, including the entry node, exit node, and a backend service.
 
-### Sending Requests to the entry node
+### Sending Requests to the Entry Node
 
 You can use the following command to send a request to the nprofile:
 
@@ -63,13 +53,11 @@ When using https, the entry node can be used as a service, since the operator wi
 
 ## Build from source
 
-You need to configure set up the exit node to make you services reachable via nostr.
+The exit node must be set up to make the services reachable via Nostr.
 
 ### Configuration
 
-Configuration can be done using environment variables.
-Alternatively, you can create a `.env` file in the `cmd/exit` directory with the following content:
-
+Configuration can be completed using environment variables or through the `.env` file created in the current working directory with the following content:
 ```
 NOSTR_RELAYS = 'ws://localhost:6666'
 NOSTR_PRIVATE_KEY = "EXITPUBLICHEX"
@@ -81,34 +69,27 @@ BACKEND_HOST = 'localhost:3338'
 - `NOSTR_PRIVATE_KEY`: The private key to sign the events
 - `BACKEND_HOST`: The host of the backend to forward requests to
 
-### Running the exit node
-
-Run the following command to start the exit node:
+To start the exit node, use this command:
 
 ```
 go run cmd/exit/main.go
 ```
 
-If your backend services supports TLS, you can now start using your service with TLS encryption using a publicly
-available entry node.
+If your backend services support TLS, your service can now start using TLS encryption through a publicly available entry node.
 
-### Running the entry node
+---
 
-If you want to run an entry node for accessing NWS services behind exit nodes, please use the following command:
-
+To run an entry node for accessing NWS services behind exit nodes, use the following command:
 ```
 go run cmd/proxy/main.go
 ```
 
 #### Entry Node Configuration
 
-If you used environment variables, there is no further configuration needed.
-Otherwise, you can create a `.env` file in the `cmd/proxy` directory with the following content:
+If you used environment variables, no further configuration is needed.
+For `.env` file configurations, do so in the current working directory with the following content:
 
 ```
 NOSTR_RELAYS = 'ws://localhost:6666'
 ```
-
-- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the
-  request.
-
+Here, NOSTR_RELAYS is a list of nostr relays to publish events to and will only be used if there was no nprofile in the request.
