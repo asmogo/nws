@@ -15,7 +15,7 @@ The exit node utilizes the private key and relay list to generate an [nprofile](
 
 ## Overview
 
-### NWS main components:
+### NWS main components
 
 1. **Entry node**: It forwards tcp packets to the exit node using a SOCKS proxy and creates encrypted events for the public key of the exit node.
 2. **Exit node**: It is a TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to the designated backend service.
