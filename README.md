@@ -45,33 +45,16 @@ When using https, the socks5 proxy can be used as a service, since the operator 
 ```
 curl -v -x socks5h://:8882  https://nprofile1qqs8a8nk09fhrxylcd42haz8ev4cprhnk5egntvs0whafvaaxpk8plgpzemhxue69uhhyetvv9ujuwpnxvejuumsv93k2g6k9kr/v1/info --insecure
 ```
+
 ### Prerequisites
 
-- A nostr private key
+- A nostr private key (for the exit node)
 - A nostr relay
-- A nostr public key that you want to reach
+- A nProfile based on the nostr public key that you want to reach
 
-
-### Running the gateway proxy
-#### Configuration
-
-Create a `.env` file in the `cmd/proxy` directory with the following content:
-
-```
-NOSTR_RELAYS = 'ws://localhost:6666'
-NOSTR_PRIVATE_KEY = "PROXYPRIVATEKEYHEX"
-```
-
-- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the request.
-- `NOSTR_PRIVATE_KEY`: The private key to sign the events
-
-Run the following command to start the gateway:
-
-```
-go run cmd/proxy/main.go
-```
 
 ### Running the exit node
+First of all, you need to set up the exit node to make you services reachable via nostr. 
 
 #### Configuration
 
@@ -92,4 +75,29 @@ Run the following command to start the exit node:
 ```
 go run cmd/exit/main.go
 ```
- 
+
+If your backend services supports TLS, you can now start using your service with TLS encryption using a publicly available gateway proxy.
+
+### Running the gateway proxy (entry node)
+If you want to offer and gateway proxy for accessing NWS services, you can use the following configuration.
+
+The relay configuration is not needed, since the gateway will use the nprofile in the request for relay resolution. 
+
+If your service does not support TLS, it is recommended to bring your own gateway proxy, since the operator of the proxy will not be able to see the request data.
+
+#### Configuration
+
+Create a `.env` file in the `cmd/proxy` directory with the following content:
+
+```
+NOSTR_RELAYS = 'ws://localhost:6666'
+```
+
+- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the request.
+
+Run the following command to start the gateway:
+
+```
+go run cmd/proxy/main.go
+```
+
