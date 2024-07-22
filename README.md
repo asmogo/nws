@@ -1,34 +1,53 @@
-# Nostr Web Services
+# Nostr Web Services (NWS)
 
-Nostr Web Services (NWS) replaces the IP layer in TCP transport using Nostr, enabling a secure and efficient connection between clients and backend services.
+---
+Nostr Web Services (NWS) replaces the IP layer in TCP transport using Nostr, enabling a secure connection between
+clients and backend services.
 
+### Prerequisites
 
-## System Overview
+Exit nodes are reachable using their [nprofile](https://nostr-nips.com/nip-19). The nprofile is a composition of a nostr
+public key and multiple relays.
 
+- A list of nostr relays, that the exit node is connected to.
+- The nostr private key (for the exit node).
+
+Using this private key and the relay list, the exit node will generate a [nprofile](https://nostr-nips.com/nip-19) and
+print it to the console on startup.
+
+## Overview
+
+---
 NWS consists of two main components:
 
-1. The **Entry Node**: This is a simple SOCKS proxy that listens on port 8882 and forwards requests to the NProfile.
-2. The **Exit Node**: This is a TCP proxy that listens for incoming Nostr subscriptions and forwards the payload to the
+1. The **Entry Node** is used to forward tcp packets to the exit node using a SOCKS proxy. It creates encrypted events
+   for the public key of the exit node.
+2. The **Exit Node** is a TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to
+   the
    designated backend service.
 
 <img src="nws.png" width="900"/>
 
+## Quickstart
 
-## How to use it
-You can run the gateway and exit node either on your localhost or using a Docker Compose file.
+---
+It is recommended to run NWS using docker.
 
+There are instructions for running NWS on your local machine in the [Build from source](#build-from-source) section.
 
 ### Using Docker Compose
-To set up using Docker Compose, run:
 
-### Sending Requests via the Gateway
-To send a request to the NProfile using the gateway running on your localhost, use:
+To set up using Docker Compose, run:
 
 ```
 docker compose up -d --build
 ```
 
-When running the gateway on your localhost, you can use the following command to send a request to the nprofile:
+This command will start an example setup including the entry node, exit node and a backend service.
+
+### Sending Requests to the entry node
+
+You can use the following command to send a request to the nprofile:
 
 ```
 curl -v -x socks5h://localhost:8882  http://nprofile1qqsp98rnlp7sn4xuf7meyec48njp2qyfch0jktwvfuqx8vdqgexkg8gpz4mhxw309ahx7um5wgkhyetvv9un5wps8qcqggauk8/v1/info --insecure
@@ -37,28 +56,19 @@ curl -v -x socks5h://localhost:8882  http://nprofile1qqsp98rnlp7sn4xuf7meyec48nj
 If the nprofile supports TLS, you can choose to connect using https scheme
 
 ```
-curl -v -x socks5h://localhost:8882  https://nprofile1qqs8a8nk09fhrxylcd42haz8ev4cprhnk5egntvs0whafvaaxpk8plgpzemhxue69uhhyetvv9ujuwpnxvejuumsv93k2g6k9kr/v1/info --insecure
+curl -v -x socks5h://localhost:8882  https://nprofile1qqstw2nc544vkl4760yeq9xt2yd0gthl4trm6ruvpukdthx9fy5xqjcpz4mhxw309ahx7um5wgkhyetvv9un5wps8qcqcelsf6/v1/info --insecure
 ```
 
-When using https, the socks5 proxy can be used as a service, since the operator of the proxy will not be able to see the request data.
+When using https, the entry node can be used as a service, since the operator will not be able to see the request data.
 
-```
-curl -v -x socks5h://:8882  https://nprofile1qqs8a8nk09fhrxylcd42haz8ev4cprhnk5egntvs0whafvaaxpk8plgpzemhxue69uhhyetvv9ujuwpnxvejuumsv93k2g6k9kr/v1/info --insecure
-```
+## Build from source
 
-### Prerequisites
+You need to configure set up the exit node to make you services reachable via nostr.
 
-- A nostr private key (for the exit node)
-- A nostr relay
-- A nProfile based on the nostr public key that you want to reach
+### Configuration
 
-
-### Running the exit node
-First of all, you need to set up the exit node to make you services reachable via nostr. 
-
-#### Configuration
-
-Create a `.env` file in the `cmd/exit` directory with the following content:
+Configuration can be done using environment variables.
+Alternatively, you can create a `.env` file in the `cmd/exit` directory with the following content:
 
 ```
 NOSTR_RELAYS = 'ws://localhost:6666'
@@ -66,9 +76,12 @@ NOSTR_PRIVATE_KEY = "EXITPUBLICHEX"
 BACKEND_HOST = 'localhost:3338'
 ```
 
-- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the request.
+- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the
+  request.
 - `NOSTR_PRIVATE_KEY`: The private key to sign the events
 - `BACKEND_HOST`: The host of the backend to forward requests to
+
+### Running the exit node
 
 Run the following command to start the exit node:
 
@@ -76,28 +89,26 @@ Run the following command to start the exit node:
 go run cmd/exit/main.go
 ```
 
-If your backend services supports TLS, you can now start using your service with TLS encryption using a publicly available gateway proxy.
+If your backend services supports TLS, you can now start using your service with TLS encryption using a publicly
+available entry node.
 
-### Running the gateway proxy (entry node)
-If you want to offer and gateway proxy for accessing NWS services, you can use the following configuration.
+### Running the entry node
 
-The relay configuration is not needed, since the gateway will use the nprofile in the request for relay resolution. 
+If you want to run an entry node for accessing NWS services behind exit nodes, please use the following command:
 
-If your service does not support TLS, it is recommended to bring your own gateway proxy, since the operator of the proxy will not be able to see the request data.
+```
+go run cmd/proxy/main.go
+```
 
-#### Configuration
+#### Entry Node Configuration
 
-Create a `.env` file in the `cmd/proxy` directory with the following content:
+If you used environment variables, there is no further configuration needed.
+Otherwise, you can create a `.env` file in the `cmd/proxy` directory with the following content:
 
 ```
 NOSTR_RELAYS = 'ws://localhost:6666'
 ```
 
-- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the request.
-
-Run the following command to start the gateway:
-
-```
-go run cmd/proxy/main.go
-```
+- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the
+  request.
 
