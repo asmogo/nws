@@ -41,6 +41,9 @@ type Exit struct {
 
 	// incomingChannel represents a channel used to receive incoming events from relays.
 	incomingChannel chan nostr.IncomingEvent
+
+	nprofile  string
+	publicKey string
 }
 
 // NewExit creates a new Exit node with the provided context and config.
@@ -76,6 +79,8 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 	if err != nil {
 		panic(err)
 	}
+	exit.nprofile = profile
+	exit.publicKey = pubKey
 	slog.Info("created exit node", "profile", profile)
 	err = exit.setSubscriptions(ctx)
 	if err != nil {

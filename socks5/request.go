@@ -181,7 +181,11 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	if dial == nil {
 		dial = netstr.DialSocks(s.pool)
 	}
-	target, err := dial(ctx, "tcp", req.realDestAddr.FQDN)
+	destination := req.realDestAddr.FQDN
+	if destination == "" {
+		destination = req.realDestAddr.String()
+	}
+	target, err := dial(ctx, "tcp", destination)
 	if err != nil {
 		msg := err.Error()
 		resp := hostUnreachable

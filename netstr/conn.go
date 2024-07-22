@@ -182,6 +182,7 @@ func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
 	nc.writeIds = append(nc.writeIds, ev.ID)
 
 	if nc.sub {
+		// immediately set sub to false, avoiding multiple subscriptions
 		nc.sub = false
 		now := nostr.Now()
 		incomingEventChannel := nc.pool.SubMany(nc.ctx, relays,
