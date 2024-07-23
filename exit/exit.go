@@ -19,6 +19,10 @@ import (
 	_ "net/http/pprof"
 )
 
+const (
+	startingReverseProxyMessage = "starting exit node with https reverse proxy"
+)
+
 // Exit represents a structure that holds information related to an exit node.
 type Exit struct {
 
@@ -47,21 +51,23 @@ type Exit struct {
 }
 
 // NewExit creates a new Exit node with the provided context and config.
-func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
+func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	// todo -- this is for debugging purposes only and should be removed
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 	pool := nostr.NewSimplePool(ctx)
-
+	if exitNodeConfig.HttpsPort != 0 {
+		exitNodeConfig.BackendHost = fmt.Sprintf(":%d", exitNodeConfig.HttpsPort)
+	}
 	exit := &Exit{
 		nostrConnectionMap: xsync.NewMapOf[string, *netstr.NostrConnection](),
-		config:             config,
+		config:             exitNodeConfig,
 		pool:               pool,
 		mutexMap:           NewMutexMap(),
 	}
 
-	for _, relayUrl := range config.NostrRelays {
+	for _, relayUrl := range exitNodeConfig.NostrRelays {
 		relay, err := exit.pool.EnsureRelay(relayUrl)
 		if err != nil {
 			fmt.Println(err)
@@ -70,12 +76,12 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 		exit.relays = append(exit.relays, relay)
 		fmt.Printf("added relay connection to %s\n", relayUrl)
 	}
-	pubKey, err := nostr.GetPublicKey(config.NostrPrivateKey)
+	pubKey, err := nostr.GetPublicKey(exitNodeConfig.NostrPrivateKey)
 	if err != nil {
 		panic(err)
 	}
 	profile, err := nip19.EncodeProfile(pubKey,
-		config.NostrRelays)
+		exitNodeConfig.NostrRelays)
 	if err != nil {
 		panic(err)
 	}
@@ -83,6 +89,15 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 	exit.publicKey = pubKey
 	slog.Info("created exit node", "profile", profile)
 	err = exit.setSubscriptions(ctx)
+	if exit.config.HttpsPort != 0 {
+		slog.Info(startingReverseProxyMessage, "port", exit.config.HttpsPort)
+		go func() {
+			err = exit.StartReverseProxy(exitNodeConfig.HttpsTarget, exit.config.HttpsPort)
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
 	if err != nil {
 		panic(err)
 	}
