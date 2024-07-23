@@ -43,7 +43,7 @@ func DialSocks(pool *nostr.SimplePool) func(ctx context.Context, net_, addr stri
 			protocol.WithUUID(connectionID),
 			protocol.WithDestination(addr),
 		}
-		ev, err := signer.CreateSignedEvent(publicKey,
+		ev, err := signer.CreateSignedEvent(publicKey, protocol.KindEphemeralEvent,
 			nostr.Tags{nostr.Tag{"p", publicKey}},
 			opts...)
 

@@ -34,11 +34,11 @@ func NewEventSigner(privateKey string) (*EventSigner, error) {
 
 // CreateEvent creates a new Event with the provided tags. The Public Key and the
 // current timestamp are set automatically. The Kind is set to KindEphemeralEvent.
-func (s *EventSigner) CreateEvent(tags nostr.Tags) nostr.Event {
+func (s *EventSigner) CreateEvent(kind int, tags nostr.Tags) nostr.Event {
 	return nostr.Event{
 		PubKey:    s.PublicKey,
 		CreatedAt: nostr.Now(),
-		Kind:      KindEphemeralEvent,
+		Kind:      kind,
 		Tags:      tags,
 	}
 }
@@ -51,7 +51,7 @@ func (s *EventSigner) CreateEvent(tags nostr.Tags) nostr.Event {
 // The encrypted message is set as the content of the event.
 // Finally, the event is signed with the private key of the EventSigner, setting the event ID and event Sig fields.
 // The signed event is returned along with any error that occurs.
-func (s *EventSigner) CreateSignedEvent(targetPublicKey string, tags nostr.Tags, opts ...MessageOption) (nostr.Event, error) {
+func (s *EventSigner) CreateSignedEvent(targetPublicKey string, kind int, tags nostr.Tags, opts ...MessageOption) (nostr.Event, error) {
 	sharedKey, err := nip04.ComputeSharedSecret(targetPublicKey, s.privateKey)
 	if err != nil {
 		return nostr.Event{}, err
@@ -64,7 +64,7 @@ func (s *EventSigner) CreateSignedEvent(targetPublicKey string, tags nostr.Tags,
 		return nostr.Event{}, err
 	}
 	encryptedMessage, err := nip04.Encrypt(string(messageJson), sharedKey)
-	ev := s.CreateEvent(tags)
+	ev := s.CreateEvent(kind, tags)
 	ev.Content = encryptedMessage
 	// calling Sign sets the event ID field and the event Sig field
 	err = ev.Sign(s.privateKey)

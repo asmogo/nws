@@ -171,7 +171,7 @@ func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
 		protocol.WithType(protocol.MessageTypeSocks5),
 		protocol.WithData(b),
 	}
-	ev, err := signer.CreateSignedEvent(publicKey, nostr.Tags{nostr.Tag{"p", publicKey}}, opts...)
+	ev, err := signer.CreateSignedEvent(publicKey, protocol.KindEphemeralEvent, nostr.Tags{nostr.Tag{"p", publicKey}}, opts...)
 	if err != nil {
 		return 0, err
 	}
