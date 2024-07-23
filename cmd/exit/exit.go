@@ -3,18 +3,15 @@ package main
 import (
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/exit"
-	"github.com/nbd-wtf/go-nostr"
 	"github.com/spf13/cobra"
-	"log/slog"
 )
 
 var httpsPort int32
 var httpTarget string
 
 const (
-	generateKeyMessage = "Generated new private key. Please set your environment using the new key, otherwise your key will be lost."
-	usagePort          = "set the https reverse proxy port"
-	usageTarget        = "set https reverse proxy target (your local service)"
+	usagePort   = "set the https reverse proxy port"
+	usageTarget = "set https reverse proxy target (your local service)"
 )
 
 func main() {
@@ -26,24 +23,21 @@ func main() {
 		panic(err)
 	}
 }
-func startExitNode(cmd *cobra.Command, args []string) {
 
+// updateConfigFlag updates the configuration with the provided flags.
+func updateConfigFlag(cfg *config.ExitConfig) {
+	cfg.HttpsPort = httpsPort
+	cfg.HttpsTarget = httpTarget
+}
+
+func startExitNode(cmd *cobra.Command, args []string) {
 	// load the configuration
 	// from the environment
 	cfg, err := config.LoadConfig[config.ExitConfig]()
 	if err != nil {
 		panic(err)
 	}
-	cfg.HttpsPort = httpsPort
-	cfg.HttpsTarget = httpTarget
-
-	if cfg.NostrPrivateKey == "" {
-		// generate new private key
-		cfg.NostrPrivateKey = nostr.GeneratePrivateKey()
-		slog.Warn(generateKeyMessage, "key", cfg.NostrPrivateKey)
-	}
-	// create a new gw server
-	// and start it
+	updateConfigFlag(cfg)
 	ctx := cmd.Context()
 	exitNode := exit.NewExit(ctx, cfg)
 	exitNode.ListenAndServe(ctx)

@@ -41,7 +41,7 @@ This will start an example environment, including the entry node, exit node, and
 You can run the following commands to receive your nprofiles:
 
 ```bash
-docker logs exit-https 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}
+docker logs exit-https 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}'
 ```
 ```bash
 docker logs exit 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}
