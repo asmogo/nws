@@ -125,7 +125,7 @@ func (e *Exit) StartReverseProxy(httpTarget string, port int32) error {
 func (e *Exit) createAndStoreCertificateData(ctx context.Context) (*tls.Certificate, error) {
 	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
+	notAfter := notBefore.Add(10 * 365 * 24 * time.Hour)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
 
