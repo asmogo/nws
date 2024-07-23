@@ -44,7 +44,7 @@ You can run the following commands to receive your nprofiles:
 docker logs exit-https 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}'
 ```
 ```bash
-docker logs exit 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}
+docker logs exit 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}`
 ```
 
 ### Sending Requests to the Entry node
