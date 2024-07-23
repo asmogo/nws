@@ -12,6 +12,7 @@ import (
 	"github.com/asmogo/nws/protocol"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip04"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/httputil"
@@ -59,6 +60,7 @@ func (e *Exit) StartReverseProxy(httpTarget string, port int32) error {
 		}
 		cert = *certificate
 	} else {
+		slog.Info("found certificate event", "certificate", ev.Content)
 		// load private key from file
 		privateKeyEvent := e.pool.QuerySingle(ctx, e.config.NostrRelays, nostr.Filter{
 			Authors: []string{e.publicKey},

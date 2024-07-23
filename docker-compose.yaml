@@ -32,7 +32,7 @@ services:
       nostr:
     environment:
       - NOSTR_RELAYS=ws://nostr-relay:8080
-      - NOSTR_PRIVATE_KEY=003632642b6df1bb7f150c25aae079d590e6cfcceca924304154fbc2a3a938e3
+      - NOSTR_PRIVATE_KEY=
       - BACKEND_HOST=mint:3338
   exit-https:
     build:
@@ -44,13 +44,13 @@ services:
       nostr:
     environment:
       - NOSTR_RELAYS=ws://nostr-relay:8080
-      - NOSTR_PRIVATE_KEY=213632642b6df1bb7f150c25aae079d590e6cfcceca924304154fbc2a3a938e3
-      - BACKEND_HOST=localhost:4443
-  proxy:
+      - NOSTR_PRIVATE_KEY=
+      - BACKEND_HOST=:4443
+  entry:
     build:
       context: .
       dockerfile: cmd/proxy/Dockerfile
-    container_name: proxy
+    container_name: entry
     ports:
       - 8882:8882
     networks:
