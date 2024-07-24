@@ -103,7 +103,7 @@ If you used environment variables, no further configuration is needed.
 For `.env` file configurations, do so in the current working directory with the following content:
 
 ```
-NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.damus.io'
+NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.com'
 ```
 
 Here, NOSTR_RELAYS is a list of nostr relays to publish events to and will only be used if there was no nprofile in the request.
