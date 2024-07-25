@@ -4,14 +4,14 @@ ADD . /build/
 
 WORKDIR /build
 RUN apk add --no-cache git bash openssh-client && \
-    go build -o proxy cmd/proxy/*.go
+    go build -o entry cmd/entry/*.go
 
 
 #building finished. Now extracting single bin in second stage.
 FROM alpine
 
-COPY --from=builder /build/proxy /app/
+COPY --from=builder /build/entry /app/
 
 WORKDIR /app
 
-CMD ["./proxy"]
+CMD ["./entry"]
