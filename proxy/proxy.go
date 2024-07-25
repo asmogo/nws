@@ -7,10 +7,7 @@ import (
 	"github.com/asmogo/nws/netstr"
 	"github.com/asmogo/nws/socks5"
 	"github.com/nbd-wtf/go-nostr"
-	"log"
 	"net"
-	"net/http"
-	_ "net/http/pprof"
 )
 
 type Proxy struct {
