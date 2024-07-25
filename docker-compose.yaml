@@ -49,7 +49,7 @@ services:
   entry:
     build:
       context: .
-      dockerfile: cmd/proxy/Dockerfile
+      dockerfile: cmd/entry/Dockerfile
     container_name: entry
     ports:
       - 8882:8882
