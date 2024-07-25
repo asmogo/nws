@@ -94,7 +94,7 @@ If your backend services support TLS, your service can now start using TLS encry
 
 To run an entry node for accessing NWS services behind exit nodes, use the following command:
 ```
-go run cmd/proxy/main.go
+go run cmd/entry/main.go
 ```
 
 #### Entry node Configuration
