@@ -85,7 +85,7 @@ BACKEND_HOST = 'localhost:3338'
 To start the exit node, use this command:
 
 ```
-go run cmd/exit/main.go
+go run cmd/exit/exit.go
 ```
 
 If your backend services support TLS, your service can now start using TLS encryption through a publicly available entry node.
