@@ -1,7 +1,6 @@
 package socks5
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"github.com/asmogo/nws/netstr"
@@ -79,15 +78,6 @@ type Request struct {
 	DestAddr *AddrSpec
 	// AddrSpec of the actual destination (might be affected by rewrite)
 	realDestAddr *AddrSpec
-	BufConn      *bufio.Reader
-}
-
-func (r Request) Buffer(c net.Conn) {
-	payload, err := r.BufConn.Peek(4096)
-	if err != nil {
-		panic(err)
-	}
-	c.Write(payload)
 }
 
 /*
@@ -119,7 +109,6 @@ func NewRequest(bufConn io.Reader) (*Request, error) {
 		Version:  socks5Version,
 		Command:  header[1],
 		DestAddr: dest,
-		BufConn:  bufConn.(*bufio.Reader),
 	}
 	return request, nil
 }

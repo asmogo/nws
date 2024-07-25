@@ -18,6 +18,8 @@ type ExitConfig struct {
 	NostrPrivateKey string   `env:"NOSTR_PRIVATE_KEY"`
 	BackendHost     string   `env:"BACKEND_HOST"`
 	BackendScheme   string   `env:"BACKEND_SCHEME"`
+	HttpsPort       int32
+	HttpsTarget     string
 }
 
 // load the and marshal Configuration from .env file from the UserHomeDir

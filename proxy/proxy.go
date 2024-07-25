@@ -7,10 +7,7 @@ import (
 	"github.com/asmogo/nws/netstr"
 	"github.com/asmogo/nws/socks5"
 	"github.com/nbd-wtf/go-nostr"
-	"log"
 	"net"
-	"net/http"
-	_ "net/http/pprof"
 )
 
 type Proxy struct {
@@ -22,10 +19,6 @@ type Proxy struct {
 }
 
 func New(ctx context.Context, config *config.ProxyConfig) *Proxy {
-	// we need a webserver to get the pprof webserver
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
 	s := &Proxy{
 		config: config,
 		pool:   nostr.NewSimplePool(ctx),

@@ -12,11 +12,13 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/puzpuzpuz/xsync/v3"
 	"golang.org/x/net/context"
-	"log"
 	"log/slog"
 	"net"
-	"net/http"
-	_ "net/http/pprof"
+)
+
+const (
+	startingReverseProxyMessage = "starting exit node with https reverse proxy"
+	generateKeyMessage          = "Generated new private key. Please set your environment using the new key, otherwise your key will be lost."
 )
 
 // Exit represents a structure that holds information related to an exit node.
@@ -41,24 +43,56 @@ type Exit struct {
 
 	// incomingChannel represents a channel used to receive incoming events from relays.
 	incomingChannel chan nostr.IncomingEvent
+
+	nprofile  string
+	publicKey string
 }
 
 // NewExit creates a new Exit node with the provided context and config.
-func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
-	// todo -- this is for debugging purposes only and should be removed
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+// This function will currently panic if there is an error while creating the Exit node.
+func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
+	// generate new private key if it is not set
+	if exitNodeConfig.NostrPrivateKey == "" {
+		// generate new private key
+		exitNodeConfig.NostrPrivateKey = nostr.GeneratePrivateKey()
+		slog.Warn(generateKeyMessage, "key", exitNodeConfig.NostrPrivateKey)
+	}
+	// get public key from private key
+	pubKey, err := nostr.GetPublicKey(exitNodeConfig.NostrPrivateKey)
+	if err != nil {
+		panic(err)
+	}
+	// encode profile
+	profile, err := nip19.EncodeProfile(pubKey,
+		exitNodeConfig.NostrRelays)
+	if err != nil {
+		panic(err)
+	}
+	// create a new pool
 	pool := nostr.NewSimplePool(ctx)
 
 	exit := &Exit{
 		nostrConnectionMap: xsync.NewMapOf[string, *netstr.NostrConnection](),
-		config:             config,
 		pool:               pool,
 		mutexMap:           NewMutexMap(),
+		publicKey:          pubKey,
+		nprofile:           profile,
 	}
-
-	for _, relayUrl := range config.NostrRelays {
+	// start reverse proxy if https port is set
+	if exitNodeConfig.HttpsPort != 0 {
+		exitNodeConfig.BackendHost = fmt.Sprintf(":%d", exitNodeConfig.HttpsPort)
+		go func(cfg *config.ExitConfig) {
+			slog.Info(startingReverseProxyMessage, "port", cfg.HttpsPort)
+			err := exit.StartReverseProxy(cfg.HttpsTarget, cfg.HttpsPort)
+			if err != nil {
+				panic(err)
+			}
+		}(exitNodeConfig)
+	}
+	// set config
+	exit.config = exitNodeConfig
+	// add relays to the pool
+	for _, relayUrl := range exitNodeConfig.NostrRelays {
 		relay, err := exit.pool.EnsureRelay(relayUrl)
 		if err != nil {
 			fmt.Println(err)
@@ -67,16 +101,9 @@ func NewExit(ctx context.Context, config *config.ExitConfig) *Exit {
 		exit.relays = append(exit.relays, relay)
 		fmt.Printf("added relay connection to %s\n", relayUrl)
 	}
-	pubKey, err := nostr.GetPublicKey(config.NostrPrivateKey)
-	if err != nil {
-		panic(err)
-	}
-	profile, err := nip19.EncodeProfile(pubKey,
-		config.NostrRelays)
-	if err != nil {
-		panic(err)
-	}
+
 	slog.Info("created exit node", "profile", profile)
+	// setup subscriptions
 	err = exit.setSubscriptions(ctx)
 	if err != nil {
 		panic(err)

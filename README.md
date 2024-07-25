@@ -28,25 +28,37 @@ Running NWS using Docker is recommended. For instructions on running NWS on your
 
 ### Using Docker Compose
 
+Please navigate to the `docker-compose.yaml` file and set `NOSTR_PRIVATE_KEY` to your own private key.
+Leaving it empty will generate a new private key on startup.
+
 To set up using Docker Compose, run the following command:
 ```
 docker compose up -d --build
 ```
 
-This will start an example setup, including the entry node, exit node, and a backend service.
+This will start an example environment, including the entry node, exit node, and a backend service.
+
+You can run the following commands to receive your nprofiles:
+
+```bash
+docker logs exit-https 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}'
+```
+```bash
+docker logs exit 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}`
+```
 
 ### Sending Requests to the Entry node
 
-You can use the following command to send a request to the nprofile:
+With the log information from the previous step, you can use the following command to send a request to the nprofile:
 
 ```
-curl -v -x socks5h://localhost:8882  http://nprofile1qqsp98rnlp7sn4xuf7meyec48njp2qyfch0jktwvfuqx8vdqgexkg8gpz4mhxw309ahx7um5wgkhyetvv9un5wps8qcqggauk8/v1/info --insecure
+curl -v -x socks5h://localhost:8882  http://"$(docker logs exit 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}' | tail -n 1)"/v1/info --insecure
 ```
 
 If the nprofile supports TLS, you can choose to connect using https scheme
 
 ```
-curl -v -x socks5h://localhost:8882  https://nprofile1qqstw2nc544vkl4760yeq9xt2yd0gthl4trm6ruvpukdthx9fy5xqjcpz4mhxw309ahx7um5wgkhyetvv9un5wps8qcqcelsf6/v1/info --insecure
+curl -v -x socks5h://localhost:8882  https://"$(docker logs exit-https 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}' | tail -n 1)"/v1/info --insecure
 ```
 
 When using https, the entry node can be used as a service, since the operator will not be able to see the request data.
@@ -57,7 +69,7 @@ The exit node must be set up to make the services reachable via Nostr.
 
 ### Configuration
 
-Configuration can be completed using environment variables.
+Configuration should be completed using environment variables.
 Alternatively, you can create a `.env` file in the current working directory with the following content:
 ```
 NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.damus.io'
@@ -82,7 +94,7 @@ If your backend services support TLS, your service can now start using TLS encry
 
 To run an entry node for accessing NWS services behind exit nodes, use the following command:
 ```
-go run cmd/proxy/proxy.go
+go run cmd/entry/main.go
 ```
 
 #### Entry node Configuration
@@ -91,7 +103,7 @@ If you used environment variables, no further configuration is needed.
 For `.env` file configurations, do so in the current working directory with the following content:
 
 ```
-NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.damus.io'
+NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.com'
 ```
 
 Here, NOSTR_RELAYS is a list of nostr relays to publish events to and will only be used if there was no nprofile in the request.

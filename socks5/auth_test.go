@@ -2,6 +2,7 @@ package socks5
 
 import (
 	"bytes"
+	"github.com/nbd-wtf/go-nostr"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ func TestNoAuth(t *testing.T) {
 	req.Write([]byte{1, NoAuth})
 	var resp bytes.Buffer
 
-	s, _ := New(&Config{})
+	s, _ := New(&Config{}, &nostr.SimplePool{})
 	ctx, err := s.authenticate(&resp, req)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -38,7 +39,7 @@ func TestPasswordAuth_Valid(t *testing.T) {
 
 	cator := UserPassAuthenticator{Credentials: cred}
 
-	s, _ := New(&Config{AuthMethods: []Authenticator{cator}})
+	s, _ := New(&Config{AuthMethods: []Authenticator{cator}}, &nostr.SimplePool{})
 
 	ctx, err := s.authenticate(&resp, req)
 	if err != nil {
@@ -74,7 +75,7 @@ func TestPasswordAuth_Invalid(t *testing.T) {
 		"foo": "bar",
 	}
 	cator := UserPassAuthenticator{Credentials: cred}
-	s, _ := New(&Config{AuthMethods: []Authenticator{cator}})
+	s, _ := New(&Config{AuthMethods: []Authenticator{cator}}, &nostr.SimplePool{})
 
 	ctx, err := s.authenticate(&resp, req)
 	if err != UserAuthFailed {
@@ -101,7 +102,7 @@ func TestNoSupportedAuth(t *testing.T) {
 	}
 	cator := UserPassAuthenticator{Credentials: cred}
 
-	s, _ := New(&Config{AuthMethods: []Authenticator{cator}})
+	s, _ := New(&Config{AuthMethods: []Authenticator{cator}}, &nostr.SimplePool{})
 
 	ctx, err := s.authenticate(&resp, req)
 	if err != NoSupportedAuth {
