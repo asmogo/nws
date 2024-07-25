@@ -2,7 +2,6 @@ package netstr
 
 import (
 	"context"
-	"github.com/asmogo/nws/protocol"
 	"github.com/nbd-wtf/go-nostr"
 	"runtime"
 	"testing"
@@ -14,21 +13,21 @@ import (
 func TestNostrConnection_Read(t *testing.T) {
 	tests := []struct {
 		name    string
-		event   protocol.IncomingEvent
+		event   nostr.IncomingEvent
 		nc      func() *NostrConnection
 		wantN   int
 		wantErr bool
 	}{
 		{
 			name:  "Read invalid relay",
-			event: protocol.IncomingEvent{Relay: nil},
+			event: nostr.IncomingEvent{Relay: nil},
 			nc: func() *NostrConnection {
 				ctx, cancelFunc := context.WithCancel(context.Background())
 				return &NostrConnection{
 					uuid:             uuid.New(),
 					ctx:              ctx,
 					cancel:           cancelFunc,
-					subscriptionChan: make(chan protocol.IncomingEvent, 1),
+					subscriptionChan: make(chan nostr.IncomingEvent, 1),
 					privateKey:       "788de536151854213cc28dff9c3042e7897f0a1d59b391ddbbc1619d7e716e78",
 				}
 			},
@@ -37,7 +36,7 @@ func TestNostrConnection_Read(t *testing.T) {
 		},
 		{
 			name: "Read",
-			event: protocol.IncomingEvent{
+			event: nostr.IncomingEvent{
 				Relay: &nostr.Relay{URL: "wss://relay.example.com"},
 				Event: &nostr.Event{
 					ID:      "eventID",
@@ -49,7 +48,7 @@ func TestNostrConnection_Read(t *testing.T) {
 					uuid:             uuid.New(),
 					ctx:              ctx,
 					cancel:           cancelFunc,
-					subscriptionChan: make(chan protocol.IncomingEvent, 1),
+					subscriptionChan: make(chan nostr.IncomingEvent, 1),
 					privateKey:       "788de536151854213cc28dff9c3042e7897f0a1d59b391ddbbc1619d7e716e78",
 				}
 			},
