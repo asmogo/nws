@@ -22,10 +22,6 @@ type Proxy struct {
 }
 
 func New(ctx context.Context, config *config.ProxyConfig) *Proxy {
-	// we need a webserver to get the pprof webserver
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
 	s := &Proxy{
 		config: config,
 		pool:   nostr.NewSimplePool(ctx),
