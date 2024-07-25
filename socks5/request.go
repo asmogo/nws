@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/asmogo/nws/netstr"
+	"github.com/google/uuid"
 	"io"
 	"net"
 	"strconv"
@@ -167,8 +168,11 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 
 	// Attempt to connect
 	dial := s.config.Dial
+	ch := make(chan net.Conn)
 	if dial == nil {
-		dial = netstr.DialSocks(s.pool)
+		connectionID := uuid.New()
+		s.tcpListener.AddConnectChannel(connectionID, ch)
+		dial = netstr.DialSocks(s.pool, connectionID)
 	}
 	target, err := dial(ctx, "tcp", req.realDestAddr.FQDN)
 	if err != nil {
@@ -192,11 +196,16 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	if err := SendReply(conn, successReply, &bind); err != nil {
 		return fmt.Errorf("failed to send reply: %v", err)
 	}
+	// read
+
+	// wait for the connection
+	connR := <-ch
+	defer connR.Close()
 
 	// Start proxying
 	errCh := make(chan error, 2)
-	go Proxy(target, conn, errCh)
-	go Proxy(conn, target, errCh)
+	go Proxy(connR, conn, errCh)
+	go Proxy(conn, connR, errCh)
 
 	// Wait
 	for i := 0; i < 2; i++ {
