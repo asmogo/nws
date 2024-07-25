@@ -14,7 +14,6 @@ import (
 	"golang.org/x/net/context"
 	"log/slog"
 	"net"
-	_ "net/http/pprof"
 )
 
 const (
@@ -50,6 +49,7 @@ type Exit struct {
 }
 
 // NewExit creates a new Exit node with the provided context and config.
+// This function will currently panic if there is an error while creating the Exit node.
 func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	// generate new private key if it is not set
 	if exitNodeConfig.NostrPrivateKey == "" {
