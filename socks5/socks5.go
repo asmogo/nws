@@ -3,6 +3,7 @@ package socks5
 import (
 	"bufio"
 	"fmt"
+	"github.com/asmogo/nws/config"
 	"github.com/nbd-wtf/go-nostr"
 	"log"
 	"net"
@@ -49,6 +50,8 @@ type Config struct {
 
 	// Optional function for dialing out
 	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
+
+	entryConfig *config.EntryConfig
 }
 
 var ErrorNoServerAvailable = fmt.Errorf("no socks server available")
@@ -63,7 +66,7 @@ type Server struct {
 }
 
 // New creates a new Server and potentially returns an error
-func New(conf *Config, pool *nostr.SimplePool) (*Server, error) {
+func New(conf *Config, pool *nostr.SimplePool, config *config.EntryConfig) (*Server, error) {
 	// Ensure we have at least one authentication method enabled
 	if len(conf.AuthMethods) == 0 {
 		if conf.Credentials != nil {
@@ -87,15 +90,21 @@ func New(conf *Config, pool *nostr.SimplePool) (*Server, error) {
 	if conf.Logger == nil {
 		conf.Logger = log.New(os.Stdout, "", log.LstdFlags)
 	}
-	listener, err := NewTCPListener()
-	if err != nil {
-		return nil, err
+	if conf.entryConfig == nil {
+		conf.entryConfig = config
 	}
-	go listener.Start()
+
 	server := &Server{
-		config:      conf,
-		pool:        pool,
-		tcpListener: listener,
+		config: conf,
+		pool:   pool,
+	}
+	if conf.entryConfig.PublicAddress != "" {
+		listener, err := NewTCPListener()
+		if err != nil {
+			return nil, err
+		}
+		go listener.Start()
+		server.tcpListener = listener
 	}
 	server.authMethods = make(map[uint8]Authenticator)
 

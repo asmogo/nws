@@ -231,7 +231,7 @@ func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, proto
 func (e *Exit) handleConnectReverse(ctx context.Context, protocolMessage *protocol.Message, isTLS bool) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
-	connection, err := net.Dial("tcp", ":1234")
+	connection, err := net.Dial("tcp", protocolMessage.Destination)
 	if err != nil {
 		return
 	}
