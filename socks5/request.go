@@ -208,18 +208,16 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 		return fmt.Errorf("failed to send reply: %v", err)
 	}
 	// read
-	var connR net.Conn
 	if options.MessageType == protocol.MessageConnectReverse {
 		// wait for the connection
-		connR = <-ch
-		defer connR.Close()
-	} else {
-		connR = target
+		// in this case, our target needs to be the reversed tcp connection
+		target = <-ch
+		defer target.Close()
 	}
 	// Start proxying
 	errCh := make(chan error, 2)
-	go Proxy(connR, conn, errCh)
-	go Proxy(conn, connR, errCh)
+	go Proxy(target, conn, errCh)
+	go Proxy(conn, target, errCh)
 
 	// Wait
 	for i := 0; i < 2; i++ {
