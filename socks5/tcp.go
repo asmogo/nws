@@ -12,8 +12,8 @@ type TCPListener struct {
 	connectChannels *xsync.MapOf[string, chan net.Conn] // todo -- use [16]byte for uuid instead of string
 }
 
-func NewTCPListener() (*TCPListener, error) {
-	l, err := net.Listen("tcp", ":1234")
+func NewTCPListener(address string) (*TCPListener, error) {
+	l, err := net.Listen("tcp", address)
 	if err != nil {
 		return nil, err
 	}

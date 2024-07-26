@@ -99,7 +99,7 @@ func New(conf *Config, pool *nostr.SimplePool, config *config.EntryConfig) (*Ser
 		pool:   pool,
 	}
 	if conf.entryConfig.PublicAddress != "" {
-		listener, err := NewTCPListener()
+		listener, err := NewTCPListener(conf.entryConfig.PublicAddress)
 		if err != nil {
 			return nil, err
 		}

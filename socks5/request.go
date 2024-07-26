@@ -166,16 +166,15 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	} else {
 		ctx = ctx_
 	}
-
-	// Attempt to connect
-	dial := s.config.Dial
 	ch := make(chan net.Conn)
+	// Attempt to connect
 	connectionID := uuid.New()
 	options := netstr.DialOptions{
 		Pool:          s.pool,
 		PublicAddress: s.config.entryConfig.PublicAddress,
 		ConnectionID:  connectionID,
 	}
+	dial := s.config.Dial
 	if dial == nil {
 		if s.tcpListener != nil {
 			s.tcpListener.AddConnectChannel(connectionID, ch)
