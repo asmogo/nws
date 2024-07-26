@@ -36,7 +36,12 @@ To set up using Docker Compose, run the following command:
 docker compose up -d --build
 ```
 
-This will start an example environment, including the entry node, exit node, and a backend service.
+This will start an example environment, including: 
+* Entry node 
+* Exit node
+* Exit node with https reverse proxy 
+* [Cashu Nutshell](https://github.com/cashubtc/nutshell) (backend service)
+* [nostr-relay](https://github.com/scsibug/nostr-rs-relay) 
 
 You can run the following commands to receive your nprofiles:
 
@@ -65,9 +70,9 @@ When using https, the entry node can be used as a service, since the operator wi
 
 ## Build from source
 
-The exit node must be set up to make the services reachable via Nostr.
+The exit node must be set up to make your services reachable via Nostr.
 
-### Configuration
+### Exit node Configuration
 
 Configuration should be completed using environment variables.
 Alternatively, you can create a `.env` file in the current working directory with the following content:
@@ -77,7 +82,7 @@ NOSTR_PRIVATE_KEY = "EXITPRIVATEHEX"
 BACKEND_HOST = 'localhost:3338'
 ```
 
-- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no nprofile in the
+- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no relay data in the
   request.
 - `NOSTR_PRIVATE_KEY`: The private key to sign the events
 - `BACKEND_HOST`: The host of the backend to forward requests to
@@ -92,18 +97,18 @@ If your backend services support TLS, your service can now start using TLS encry
 
 ---
 
+### Entry node Configuration
+
 To run an entry node for accessing NWS services behind exit nodes, use the following command:
 ```
 go run cmd/entry/main.go
 ```
-
-#### Entry node Configuration
-
-If you used environment variables, no further configuration is needed.
-For `.env` file configurations, do so in the current working directory with the following content:
+If you don't want to use the `PUBLIC_ADDRESS` feature, no further configuration is needed.
 
 ```
-NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.com'
+PUBLIC_ADDRESS = '<public_ip>:<port>'
 ```
 
-Here, NOSTR_RELAYS is a list of nostr relays to publish events to and will only be used if there was no nprofile in the request.
+- `PUBLIC_ADDRESS`: This can be set if the entry node is publicly available. When set, the entry node will additionally bind to this address. Exit node discovery will still be done using Nostr. Once a connection is established, this public address will be used to transmit further data. 
+- `NOSTR_RELAYS`: A list of nostr relays to publish events to. Will only be used if there was no relay data in the
+  request.
