@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/base32"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"github.com/asmogo/nws/protocol"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip04"
@@ -253,10 +255,7 @@ func ParseDestinationDomain(destination string) (string, []string, error) {
 	}
 	var subdomains []string
 	split := strings.Split(url.SubName, ".")
-	for i, subdomain := range split {
-		if i == len(split)-1 {
-			break
-		}
+	for _, subdomain := range split {
 		decodedSubDomain, err := base32.HexEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(subdomain))
 		if err != nil {
 			continue
@@ -265,8 +264,17 @@ func ParseDestinationDomain(destination string) (string, []string, error) {
 	}
 
 	// base32 decode the subdomain
-	domain := split[len(split)-1] + url.Name
-	return domain, subdomains, nil
+	decodedPubKey, err := base32.HexEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(url.Name))
+
+	if err != nil {
+		return "", nil, err
+	}
+	pk, err := schnorr.ParsePubKey(decodedPubKey)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return hex.EncodeToString(pk.SerializeCompressed())[2:], subdomains, nil
 }
 
 func (nc *NostrConnection) Close() error {

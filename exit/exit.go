@@ -3,11 +3,14 @@ package exit
 import (
 	"crypto/tls"
 	"encoding/base32"
+	"encoding/hex"
 	"fmt"
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/netstr"
 	"github.com/asmogo/nws/protocol"
 	"github.com/asmogo/nws/socks5"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip04"
 	"github.com/nbd-wtf/go-nostr/nip19"
@@ -109,7 +112,13 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 			domain = fmt.Sprintf("%s.%s", domain, base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl)))
 		}
 	}
-	domain = strings.ToLower(fmt.Sprintf("%s.%s.nostr", domain, fmt.Sprintf("%s.%s", exit.publicKey[:32], exit.publicKey[32:])))
+
+	decoded, err := GetPublicKey(exit.config.NostrPrivateKey)
+	if err != nil {
+		panic(err)
+	}
+
+	domain = strings.ToLower(fmt.Sprintf("%s.%s.nostr", domain, decoded))
 	slog.Info("created exit node", "profile", profile, "domain", domain)
 	// setup subscriptions
 	err = exit.setSubscriptions(ctx)
@@ -117,6 +126,17 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 		panic(err)
 	}
 	return exit
+}
+
+func GetPublicKey(sk string) (string, error) {
+	b, err := hex.DecodeString(sk)
+	if err != nil {
+		return "", err
+	}
+
+	_, pk := btcec.PrivKeyFromBytes(b)
+
+	return base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(schnorr.SerializePubKey(pk)), nil
 }
 
 // setSubscriptions sets up subscriptions for the Exit node to receive incoming events from the specified relays.
