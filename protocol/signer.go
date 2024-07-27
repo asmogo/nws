@@ -11,8 +11,7 @@ const KindEphemeralEvent int = 38333
 
 // EventSigner represents a signer that can create and sign events.
 //
-// EventSigner provides methods for creating unsigned events, creating signed events,
-// and decrypting and writing events received from an exit node.
+// EventSigner provides methods for creating unsigned events, creating signed events
 type EventSigner struct {
 	PublicKey  string
 	privateKey string

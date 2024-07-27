@@ -9,7 +9,7 @@ import (
 func main() {
 	// load the configuration
 	// from the environment
-	cfg, err := config.LoadConfig[config.ProxyConfig]()
+	cfg, err := config.LoadConfig[config.EntryConfig]()
 	if err != nil {
 		panic(err)
 	}

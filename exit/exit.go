@@ -183,6 +183,8 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 	switch protocolMessage.Type {
 	case protocol.MessageConnect:
 		e.handleConnect(ctx, msg, protocolMessage, false)
+	case protocol.MessageConnectReverse:
+		e.handleConnectReverse(ctx, protocolMessage, false)
 	case protocol.MessageTypeSocks5:
 		e.handleSocks5ProxyMessage(msg, protocolMessage)
 	}
@@ -222,6 +224,33 @@ func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, proto
 
 	e.nostrConnectionMap.Store(protocolMessage.Key.String(), connection)
 
+	go socks5.Proxy(dst, connection, nil)
+	go socks5.Proxy(connection, dst, nil)
+}
+
+func (e *Exit) handleConnectReverse(ctx context.Context, protocolMessage *protocol.Message, isTLS bool) {
+	e.mutexMap.Lock(protocolMessage.Key.String())
+	defer e.mutexMap.Unlock(protocolMessage.Key.String())
+	connection, err := net.Dial("tcp", protocolMessage.Destination)
+	if err != nil {
+		return
+	}
+	var dst net.Conn
+	if isTLS {
+		conf := tls.Config{InsecureSkipVerify: true}
+		dst, err = tls.Dial("tcp", e.config.BackendHost, &conf)
+	} else {
+		dst, err = net.Dial("tcp", e.config.BackendHost)
+	}
+	if err != nil {
+		slog.Error("could not connect to backend", "error", err)
+		return
+	}
+
+	_, err = connection.Write([]byte(protocolMessage.Key.String()))
+	if err != nil {
+		return
+	}
 	go socks5.Proxy(dst, connection, nil)
 	go socks5.Proxy(connection, dst, nil)
 }

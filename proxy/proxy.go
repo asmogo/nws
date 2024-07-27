@@ -11,14 +11,14 @@ import (
 )
 
 type Proxy struct {
-	config *config.ProxyConfig // the configuration for the gateway
+	config *config.EntryConfig // the configuration for the gateway
 	// a list of nostr relays to publish events to
 	relays      []*nostr.Relay // deprecated -- should be used for default relay configuration
 	pool        *nostr.SimplePool
 	socksServer *socks5.Server
 }
 
-func New(ctx context.Context, config *config.ProxyConfig) *Proxy {
+func New(ctx context.Context, config *config.EntryConfig) *Proxy {
 	s := &Proxy{
 		config: config,
 		pool:   nostr.NewSimplePool(ctx),
@@ -32,7 +32,7 @@ func New(ctx context.Context, config *config.ProxyConfig) *Proxy {
 		BindIP:      net.IP{0, 0, 0, 0},
 		Logger:      nil,
 		Dial:        nil,
-	}, s.pool)
+	}, s.pool, config)
 	if err != nil {
 		panic(err)
 	}

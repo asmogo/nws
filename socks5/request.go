@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/asmogo/nws/netstr"
+	"github.com/asmogo/nws/protocol"
+	"github.com/google/uuid"
 	"io"
 	"net"
 	"strconv"
@@ -164,11 +166,23 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	} else {
 		ctx = ctx_
 	}
-
+	ch := make(chan net.Conn)
 	// Attempt to connect
+	connectionID := uuid.New()
+	options := netstr.DialOptions{
+		Pool:          s.pool,
+		PublicAddress: s.config.entryConfig.PublicAddress,
+		ConnectionID:  connectionID,
+	}
 	dial := s.config.Dial
 	if dial == nil {
-		dial = netstr.DialSocks(s.pool)
+		if s.tcpListener != nil {
+			s.tcpListener.AddConnectChannel(connectionID, ch)
+			options.MessageType = protocol.MessageConnectReverse
+		} else {
+			options.MessageType = protocol.MessageConnect
+		}
+		dial = netstr.DialSocks(options)
 	}
 	target, err := dial(ctx, "tcp", req.realDestAddr.FQDN)
 	if err != nil {
@@ -192,7 +206,13 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	if err := SendReply(conn, successReply, &bind); err != nil {
 		return fmt.Errorf("failed to send reply: %v", err)
 	}
-
+	// read
+	if options.MessageType == protocol.MessageConnectReverse {
+		// wait for the connection
+		// in this case, our target needs to be the reversed tcp connection
+		target = <-ch
+		defer target.Close()
+	}
 	// Start proxying
 	errCh := make(chan error, 2)
 	go Proxy(target, conn, errCh)

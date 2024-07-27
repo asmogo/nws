@@ -8,8 +8,9 @@ import (
 type MessageType string
 
 var (
-	MessageTypeSocks5 = MessageType("SOCKS5")
-	MessageConnect    = MessageType("CONNECT")
+	MessageTypeSocks5     = MessageType("SOCKS5")
+	MessageConnect        = MessageType("CONNECT")
+	MessageConnectReverse = MessageType("CONNECTR")
 )
 
 type Message struct {

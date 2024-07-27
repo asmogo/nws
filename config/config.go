@@ -9,8 +9,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type ProxyConfig struct {
-	NostrRelays []string `env:"NOSTR_RELAYS" envSeparator:";"`
+type EntryConfig struct {
+	NostrRelays   []string `env:"NOSTR_RELAYS" envSeparator:";"`
+	PublicAddress string   `env:"PUBLIC_ADDRESS"`
 }
 
 type ExitConfig struct {
