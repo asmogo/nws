@@ -8,7 +8,6 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 	"log/slog"
 	"net"
-	"strings"
 )
 
 type DialOptions struct {
@@ -26,7 +25,6 @@ type DialOptions struct {
 // Finally, it returns the Connection and nil error. If there are any errors, nil connection and the error are returned.
 func DialSocks(options DialOptions) func(ctx context.Context, net_, addr string) (net.Conn, error) {
 	return func(ctx context.Context, net_, addr string) (net.Conn, error) {
-		addr = strings.ReplaceAll(addr, ".", "")
 		key := nostr.GeneratePrivateKey()
 		connection := NewConnection(ctx,
 			WithPrivateKey(key),

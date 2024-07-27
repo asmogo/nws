@@ -3,6 +3,7 @@ package netstr
 import (
 	"bytes"
 	"context"
+	"encoding/base32"
 	"encoding/base64"
 	"fmt"
 	"github.com/asmogo/nws/protocol"
@@ -13,6 +14,7 @@ import (
 	"github.com/samber/lo"
 	"log/slog"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -216,6 +218,10 @@ func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
 // If the prefix is "nprofile", the public key and relays are extracted.
 // Returns the public key, relays (if any), and any error encountered.
 func ParseDestination(destination string) (string, []string, error) {
+	// check if destination ends with .nostr
+	if strings.HasSuffix(destination, ".nostr") {
+		return ParseDestinationDomain(destination)
+	}
 	// destination can be npub or nprofile
 	prefix, pubKey, err := nip19.Decode(destination)
 
@@ -235,6 +241,32 @@ func ParseDestination(destination string) (string, []string, error) {
 		relays = profilePointer.Relays
 	}
 	return publicKey, relays, nil
+}
+
+func ParseDestinationDomain(destination string) (string, []string, error) {
+	url, err := protocol.Parse(destination)
+	if err != nil {
+		return "", nil, err
+	}
+	if !url.IsDomain {
+		//	return "", nil, fmt.Errorf("destination is not a domain")
+	}
+	var subdomains []string
+	split := strings.Split(url.SubName, ".")
+	for i, subdomain := range split {
+		if i == len(split)-1 {
+			break
+		}
+		decodedSubDomain, err := base32.HexEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(subdomain))
+		if err != nil {
+			continue
+		}
+		subdomains = append(subdomains, string(decodedSubDomain))
+	}
+
+	// base32 decode the subdomain
+	domain := split[len(split)-1] + url.Name
+	return domain, subdomains, nil
 }
 
 func (nc *NostrConnection) Close() error {

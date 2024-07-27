@@ -2,6 +2,7 @@ package exit
 
 import (
 	"crypto/tls"
+	"encoding/base32"
 	"fmt"
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/netstr"
@@ -14,6 +15,7 @@ import (
 	"golang.org/x/net/context"
 	"log/slog"
 	"net"
+	"strings"
 )
 
 const (
@@ -92,6 +94,7 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	// set config
 	exit.config = exitNodeConfig
 	// add relays to the pool
+	var domain string
 	for _, relayUrl := range exitNodeConfig.NostrRelays {
 		relay, err := exit.pool.EnsureRelay(relayUrl)
 		if err != nil {
@@ -100,9 +103,14 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 		}
 		exit.relays = append(exit.relays, relay)
 		fmt.Printf("added relay connection to %s\n", relayUrl)
+		if domain == "" {
+			domain = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl))
+		} else {
+			domain = fmt.Sprintf("%s.%s", domain, base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl)))
+		}
 	}
-
-	slog.Info("created exit node", "profile", profile)
+	domain = strings.ToLower(fmt.Sprintf("%s.%s.nostr", domain, fmt.Sprintf("%s.%s", exit.publicKey[:32], exit.publicKey[32:])))
+	slog.Info("created exit node", "profile", profile, "domain", domain)
 	// setup subscriptions
 	err = exit.setSubscriptions(ctx)
 	if err != nil {
