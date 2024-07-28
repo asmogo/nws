@@ -97,7 +97,6 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	// set config
 	exit.config = exitNodeConfig
 	// add relays to the pool
-	var domain string
 	for _, relayUrl := range exitNodeConfig.NostrRelays {
 		relay, err := exit.pool.EnsureRelay(relayUrl)
 		if err != nil {
@@ -106,19 +105,12 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 		}
 		exit.relays = append(exit.relays, relay)
 		fmt.Printf("added relay connection to %s\n", relayUrl)
-		if domain == "" {
-			domain = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl))
-		} else {
-			domain = fmt.Sprintf("%s.%s", domain, base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl)))
-		}
-	}
 
-	decoded, err := GetPublicKey(exit.config.NostrPrivateKey)
+	}
+	domain, err := exit.getDomain()
 	if err != nil {
 		panic(err)
 	}
-
-	domain = strings.ToLower(fmt.Sprintf("%s.%s.nostr", domain, decoded))
 	slog.Info("created exit node", "profile", profile, "domain", domain)
 	// setup subscriptions
 	err = exit.setSubscriptions(ctx)
@@ -128,14 +120,48 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	return exit
 }
 
-func GetPublicKey(sk string) (string, error) {
+// getDomain returns the domain string used by the Exit node for communication with the Nostr relays.
+// It concatenates the relay URLs using base32 encoding with no padding, separated by dots.
+// The resulting domain is then appended with the base32 encoded public key obtained using the configured Nostr private key.
+// The final domain string is converted to lowercase and returned.
+// If any errors occur during the process, they are returned along with an
+func (e *Exit) getDomain() (string, error) {
+	var domain string
+	// first lets build the subdomains
+	for _, relayUrl := range e.config.NostrRelays {
+		if domain == "" {
+			domain = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl))
+		} else {
+			domain = fmt.Sprintf("%s.%s", domain, base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl)))
+		}
+	}
+	// create base32 encoded public key
+	decoded, err := GetPublicKeyBase32(e.config.NostrPrivateKey)
+	if err != nil {
+		return "", err
+	}
+	// use public key as host. add TLD
+	domain = strings.ToLower(fmt.Sprintf("%s.%s.nostr", domain, decoded))
+	return domain, nil
+}
+
+// GetPublicKeyBase32 decodes the private key string from hexadecimal format
+// and returns the base32 encoded public key obtained using the provided private key.
+// The base32 encoding has no padding. If there is an error decoding the private key
+// or generating the public key, an error is returned.
+//
+// Parameters:
+// - sk: The private key string in hexadecimal format
+//
+// Returns:
+// - The base32 encoded public key as a string
+// - Any error that occurred during the process
+func GetPublicKeyBase32(sk string) (string, error) {
 	b, err := hex.DecodeString(sk)
 	if err != nil {
 		return "", err
 	}
-
 	_, pk := btcec.PrivKeyFromBytes(b)
-
 	return base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(schnorr.SerializePubKey(pk)), nil
 }
 
@@ -208,6 +234,7 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 		slog.Error("could not unmarshal message")
 		return
 	}
+	// todo -- remove isTLS from both connection handlers (use generic handler)
 	switch protocolMessage.Type {
 	case protocol.MessageConnect:
 		e.handleConnect(ctx, msg, protocolMessage, false)

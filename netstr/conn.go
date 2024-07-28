@@ -273,7 +273,7 @@ func ParseDestinationDomain(destination string) (string, []string, error) {
 	if err != nil {
 		return "", nil, err
 	}
-
+	// todo -- check if this is correct
 	return hex.EncodeToString(pk.SerializeCompressed())[2:], subdomains, nil
 }
 
