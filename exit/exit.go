@@ -1,19 +1,24 @@
 package exit
 
 import (
-	"crypto/tls"
+	"encoding/base32"
+	"encoding/hex"
 	"fmt"
+	"log/slog"
+	"net"
+	"strings"
+
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/netstr"
 	"github.com/asmogo/nws/protocol"
 	"github.com/asmogo/nws/socks5"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip04"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/puzpuzpuz/xsync/v3"
 	"golang.org/x/net/context"
-	"log/slog"
-	"net"
 )
 
 const (
@@ -100,15 +105,64 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 		}
 		exit.relays = append(exit.relays, relay)
 		fmt.Printf("added relay connection to %s\n", relayUrl)
-	}
 
-	slog.Info("created exit node", "profile", profile)
+	}
+	domain, err := exit.getDomain()
+	if err != nil {
+		panic(err)
+	}
+	slog.Info("created exit node", "profile", profile, "domain", domain)
 	// setup subscriptions
 	err = exit.setSubscriptions(ctx)
 	if err != nil {
 		panic(err)
 	}
 	return exit
+}
+
+// getDomain returns the domain string used by the Exit node for communication with the Nostr relays.
+// It concatenates the relay URLs using base32 encoding with no padding, separated by dots.
+// The resulting domain is then appended with the base32 encoded public key obtained using the configured Nostr private key.
+// The final domain string is converted to lowercase and returned.
+// If any errors occur during the process, they are returned along with an
+func (e *Exit) getDomain() (string, error) {
+	var domain string
+	// first lets build the subdomains
+	for _, relayUrl := range e.config.NostrRelays {
+		if domain == "" {
+			domain = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl))
+		} else {
+			domain = fmt.Sprintf("%s.%s", domain, base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl)))
+		}
+	}
+	// create base32 encoded public key
+	decoded, err := GetPublicKeyBase32(e.config.NostrPrivateKey)
+	if err != nil {
+		return "", err
+	}
+	// use public key as host. add TLD
+	domain = strings.ToLower(fmt.Sprintf("%s.%s.nostr", domain, decoded))
+	return domain, nil
+}
+
+// GetPublicKeyBase32 decodes the private key string from hexadecimal format
+// and returns the base32 encoded public key obtained using the provided private key.
+// The base32 encoding has no padding. If there is an error decoding the private key
+// or generating the public key, an error is returned.
+//
+// Parameters:
+// - sk: The private key string in hexadecimal format
+//
+// Returns:
+// - The base32 encoded public key as a string
+// - Any error that occurred during the process
+func GetPublicKeyBase32(sk string) (string, error) {
+	b, err := hex.DecodeString(sk)
+	if err != nil {
+		return "", err
+	}
+	_, pk := btcec.PrivKeyFromBytes(b)
+	return base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(schnorr.SerializePubKey(pk)), nil
 }
 
 // setSubscriptions sets up subscriptions for the Exit node to receive incoming events from the specified relays.
@@ -140,7 +194,8 @@ func (e *Exit) handleSubscription(ctx context.Context, pubKey string, since nost
 			Since: &since,
 			Tags: nostr.TagMap{
 				"p": []string{pubKey},
-			}},
+			},
+		},
 	})
 	e.incomingChannel = incomingEventChannel
 	return nil
@@ -182,9 +237,9 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 	}
 	switch protocolMessage.Type {
 	case protocol.MessageConnect:
-		e.handleConnect(ctx, msg, protocolMessage, false)
+		e.handleConnect(ctx, msg, protocolMessage)
 	case protocol.MessageConnectReverse:
-		e.handleConnectReverse(ctx, protocolMessage, false)
+		e.handleConnectReverse(protocolMessage)
 	case protocol.MessageTypeSocks5:
 		e.handleSocks5ProxyMessage(msg, protocolMessage)
 	}
@@ -197,7 +252,10 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 // If the connection cannot be established, it logs an error and returns.
 // It then stores the connection in the nostrConnectionMap and creates two goroutines
 // to proxy the data between the connection and the backend.
-func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, protocolMessage *protocol.Message, isTLS bool) {
+func (e *Exit) handleConnect(
+	ctx context.Context,
+	msg nostr.IncomingEvent,
+	protocolMessage *protocol.Message) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
 	receiver, err := nip19.EncodeProfile(msg.PubKey, []string{msg.Relay.String()})
@@ -211,12 +269,7 @@ func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, proto
 		netstr.WithUUID(protocolMessage.Key),
 	)
 	var dst net.Conn
-	if isTLS {
-		conf := tls.Config{InsecureSkipVerify: true}
-		dst, err = tls.Dial("tcp", e.config.BackendHost, &conf)
-	} else {
-		dst, err = net.Dial("tcp", e.config.BackendHost)
-	}
+	dst, err = net.Dial("tcp", e.config.BackendHost)
 	if err != nil {
 		slog.Error("could not connect to backend", "error", err)
 		return
@@ -228,7 +281,7 @@ func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, proto
 	go socks5.Proxy(connection, dst, nil)
 }
 
-func (e *Exit) handleConnectReverse(ctx context.Context, protocolMessage *protocol.Message, isTLS bool) {
+func (e *Exit) handleConnectReverse(protocolMessage *protocol.Message) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
 	connection, err := net.Dial("tcp", protocolMessage.Destination)
@@ -236,12 +289,7 @@ func (e *Exit) handleConnectReverse(ctx context.Context, protocolMessage *protoc
 		return
 	}
 	var dst net.Conn
-	if isTLS {
-		conf := tls.Config{InsecureSkipVerify: true}
-		dst, err = tls.Dial("tcp", e.config.BackendHost, &conf)
-	} else {
-		dst, err = net.Dial("tcp", e.config.BackendHost)
-	}
+	dst, err = net.Dial("tcp", e.config.BackendHost)
 	if err != nil {
 		slog.Error("could not connect to backend", "error", err)
 		return

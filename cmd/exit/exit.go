@@ -6,15 +6,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var httpsPort int32
-var httpTarget string
-
 const (
 	usagePort   = "set the https reverse proxy port"
 	usageTarget = "set https reverse proxy target (your local service)"
 )
 
 func main() {
+
+	var httpsPort int32
+	var httpTarget string
 	rootCmd := &cobra.Command{Use: "exit", Run: startExitNode}
 	rootCmd.Flags().Int32VarP(&httpsPort, "port", "p", 0, usagePort)
 	rootCmd.Flags().StringVarP(&httpTarget, "target", "t", "", usageTarget)
@@ -25,9 +25,19 @@ func main() {
 }
 
 // updateConfigFlag updates the configuration with the provided flags.
-func updateConfigFlag(cfg *config.ExitConfig) {
+func updateConfigFlag(cmd *cobra.Command, cfg *config.ExitConfig) error {
+
+	httpsPort, err := cmd.Flags().GetInt32("port")
+	if err != nil {
+		return err
+	}
+	httpTarget, err := cmd.Flags().GetString("target")
+	if err != nil {
+		return err
+	}
 	cfg.HttpsPort = httpsPort
 	cfg.HttpsTarget = httpTarget
+	return nil
 }
 
 func startExitNode(cmd *cobra.Command, args []string) {
@@ -37,7 +47,7 @@ func startExitNode(cmd *cobra.Command, args []string) {
 	if err != nil {
 		panic(err)
 	}
-	updateConfigFlag(cfg)
+	updateConfigFlag(cmd, cfg)
 	ctx := cmd.Context()
 	exitNode := exit.NewExit(ctx, cfg)
 	exitNode.ListenAndServe(ctx)

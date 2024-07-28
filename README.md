@@ -1,32 +1,37 @@
 # Nostr Web Services (NWS)
 
-
 NWS replaces the IP layer in TCP transport using Nostr, enabling a secure connection between
 clients and backend services.
 
-Exit nodes are reachable through their [nprofiles](https://nostr-nips.com/nip-19), which are combinations of a Nostr public key and multiple relays.
+Exit node [domain names](#nws-domain-names) make private services accessible to entry nodes.
 
 ### Prerequisites
 
 - A list of Nostr relays that the exit node is connected to.
 - The Nostr private key of the exit node.
 
-The exit node utilizes the private key and relay list to generate an [nprofile](https://nostr-nips.com/nip-19), which is printed in the console on startup.
-
 ## Overview
 
 ### NWS main components
 
-1. **Entry node**: It forwards tcp packets to the exit node using a SOCKS proxy and creates encrypted events for the public key of the exit node.
-2. **Exit node**: It is a TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to the designated backend service.
+1. **Exit node**: It is a TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to your designated backend service.
+2. **Entry node**: It forwards tcp packets to the exit node using a SOCKS proxy and creates encrypted events for the exit node.
 
 <img src="nws.png" width="900"/>
+
+### NWS domain names
+
+There are two types of domain names resolved by NWS entry nodes:
+1. `.nostr` domains have base32 encoded public key hostnames and base32 encoded relays as subdomains.
+2. [nprofiles](https://nostr-nips.com/nip-19) are combinations of a Nostr public key and multiple relays.
+
+Both types of domains will be generated and printed in the console on startup
 
 ## Quickstart
 
 Running NWS using Docker is recommended. For instructions on running NWS on your local machine, refer to the [Build from source](#build-from-source) section.
 
-### Using Docker Compose
+### Using Docker-Compose
 
 Please navigate to the `docker-compose.yaml` file and set `NOSTR_PRIVATE_KEY` to your own private key.
 Leaving it empty will generate a new private key on startup.
@@ -43,27 +48,28 @@ This will start an example environment, including:
 * [Cashu Nutshell](https://github.com/cashubtc/nutshell) (backend service)
 * [nostr-relay](https://github.com/scsibug/nostr-rs-relay) 
 
-You can run the following commands to receive your nprofiles:
+You can run the following commands to receive your NWS domain:
 
 ```bash
-docker logs exit-https 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}'
+docker logs exit-https 2>&1 | awk -F'domain=' '{if ($2) print $2}' | awk '{print $1}'
 ```
+
 ```bash
-docker logs exit 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}`
+docker logs exit 2>&1 | awk -F'domain=' '{if ($2) print $2}' | awk '{print $1}`
 ```
 
-### Sending Requests to the Entry node
+### Sending requests to the entry node
 
-With the log information from the previous step, you can use the following command to send a request to the nprofile:
-
-```
-curl -v -x socks5h://localhost:8882  http://"$(docker logs exit 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}' | tail -n 1)"/v1/info --insecure
-```
-
-If the nprofile supports TLS, you can choose to connect using https scheme
+With the log information from the previous step, you can use the following command to send a request to the exit node domain:
 
 ```
-curl -v -x socks5h://localhost:8882  https://"$(docker logs exit-https 2>&1 | awk -F'profile=' '{if ($2) print $2}' | awk '{print $1}' | tail -n 1)"/v1/info --insecure
+curl -v -x socks5h://localhost:8882  http://"$(docker logs exit 2>&1 | awk -F'domain=' '{if ($2) print $2}' | awk '{print $1}' | tail -n 1)"/v1/info --insecure
+```
+
+If the exit node supports TLS, you can choose to connect using https scheme
+
+```
+curl -v -x socks5h://localhost:8882  https://"$(docker logs exit-https 2>&1 | awk -F'domain=' '{if ($2) print $2}' | awk '{print $1}' | tail -n 1)"/v1/info --insecure
 ```
 
 When using https, the entry node can be used as a service, since the operator will not be able to see the request data.
@@ -72,7 +78,7 @@ When using https, the entry node can be used as a service, since the operator wi
 
 The exit node must be set up to make your services reachable via Nostr.
 
-### Exit node Configuration
+### Exit node
 
 Configuration should be completed using environment variables.
 Alternatively, you can create a `.env` file in the current working directory with the following content:
@@ -97,7 +103,7 @@ If your backend services support TLS, your service can now start using TLS encry
 
 ---
 
-### Entry node Configuration
+### Entry node
 
 To run an entry node for accessing NWS services behind exit nodes, use the following command:
 ```

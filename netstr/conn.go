@@ -3,9 +3,12 @@ package netstr
 import (
 	"bytes"
 	"context"
+	"encoding/base32"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"github.com/asmogo/nws/protocol"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip04"
@@ -13,6 +16,7 @@ import (
 	"github.com/samber/lo"
 	"log/slog"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -216,6 +220,10 @@ func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
 // If the prefix is "nprofile", the public key and relays are extracted.
 // Returns the public key, relays (if any), and any error encountered.
 func ParseDestination(destination string) (string, []string, error) {
+	// check if destination ends with .nostr
+	if strings.HasSuffix(destination, ".nostr") {
+		return ParseDestinationDomain(destination)
+	}
 	// destination can be npub or nprofile
 	prefix, pubKey, err := nip19.Decode(destination)
 
@@ -235,6 +243,38 @@ func ParseDestination(destination string) (string, []string, error) {
 		relays = profilePointer.Relays
 	}
 	return publicKey, relays, nil
+}
+
+func ParseDestinationDomain(destination string) (string, []string, error) {
+	url, err := protocol.Parse(destination)
+	if err != nil {
+		return "", nil, err
+	}
+	if !url.IsDomain {
+		//	return "", nil, fmt.Errorf("destination is not a domain")
+	}
+	var subdomains []string
+	split := strings.Split(url.SubName, ".")
+	for _, subdomain := range split {
+		decodedSubDomain, err := base32.HexEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(subdomain))
+		if err != nil {
+			continue
+		}
+		subdomains = append(subdomains, string(decodedSubDomain))
+	}
+
+	// base32 decode the subdomain
+	decodedPubKey, err := base32.HexEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(url.Name))
+
+	if err != nil {
+		return "", nil, err
+	}
+	pk, err := schnorr.ParsePubKey(decodedPubKey)
+	if err != nil {
+		return "", nil, err
+	}
+	// todo -- check if this is correct
+	return hex.EncodeToString(pk.SerializeCompressed())[2:], subdomains, nil
 }
 
 func (nc *NostrConnection) Close() error {
