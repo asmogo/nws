@@ -1,10 +1,13 @@
 package exit
 
 import (
-	"crypto/tls"
 	"encoding/base32"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
+	"net"
+	"strings"
+
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/netstr"
 	"github.com/asmogo/nws/protocol"
@@ -16,9 +19,6 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/puzpuzpuz/xsync/v3"
 	"golang.org/x/net/context"
-	"log/slog"
-	"net"
-	"strings"
 )
 
 const (
@@ -194,7 +194,8 @@ func (e *Exit) handleSubscription(ctx context.Context, pubKey string, since nost
 			Since: &since,
 			Tags: nostr.TagMap{
 				"p": []string{pubKey},
-			}},
+			},
+		},
 	})
 	e.incomingChannel = incomingEventChannel
 	return nil
@@ -234,12 +235,11 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 		slog.Error("could not unmarshal message")
 		return
 	}
-	// todo -- remove isTLS from both connection handlers (use generic handler)
 	switch protocolMessage.Type {
 	case protocol.MessageConnect:
-		e.handleConnect(ctx, msg, protocolMessage, false)
+		e.handleConnect(ctx, msg, protocolMessage)
 	case protocol.MessageConnectReverse:
-		e.handleConnectReverse(ctx, protocolMessage, false)
+		e.handleConnectReverse(protocolMessage)
 	case protocol.MessageTypeSocks5:
 		e.handleSocks5ProxyMessage(msg, protocolMessage)
 	}
@@ -252,7 +252,10 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 // If the connection cannot be established, it logs an error and returns.
 // It then stores the connection in the nostrConnectionMap and creates two goroutines
 // to proxy the data between the connection and the backend.
-func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, protocolMessage *protocol.Message, isTLS bool) {
+func (e *Exit) handleConnect(
+	ctx context.Context,
+	msg nostr.IncomingEvent,
+	protocolMessage *protocol.Message) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
 	receiver, err := nip19.EncodeProfile(msg.PubKey, []string{msg.Relay.String()})
@@ -266,12 +269,7 @@ func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, proto
 		netstr.WithUUID(protocolMessage.Key),
 	)
 	var dst net.Conn
-	if isTLS {
-		conf := tls.Config{InsecureSkipVerify: true}
-		dst, err = tls.Dial("tcp", e.config.BackendHost, &conf)
-	} else {
-		dst, err = net.Dial("tcp", e.config.BackendHost)
-	}
+	dst, err = net.Dial("tcp", e.config.BackendHost)
 	if err != nil {
 		slog.Error("could not connect to backend", "error", err)
 		return
@@ -283,7 +281,7 @@ func (e *Exit) handleConnect(ctx context.Context, msg nostr.IncomingEvent, proto
 	go socks5.Proxy(connection, dst, nil)
 }
 
-func (e *Exit) handleConnectReverse(ctx context.Context, protocolMessage *protocol.Message, isTLS bool) {
+func (e *Exit) handleConnectReverse(protocolMessage *protocol.Message) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
 	connection, err := net.Dial("tcp", protocolMessage.Destination)
@@ -291,12 +289,7 @@ func (e *Exit) handleConnectReverse(ctx context.Context, protocolMessage *protoc
 		return
 	}
 	var dst net.Conn
-	if isTLS {
-		conf := tls.Config{InsecureSkipVerify: true}
-		dst, err = tls.Dial("tcp", e.config.BackendHost, &conf)
-	} else {
-		dst, err = net.Dial("tcp", e.config.BackendHost)
-	}
+	dst, err = net.Dial("tcp", e.config.BackendHost)
 	if err != nil {
 		slog.Error("could not connect to backend", "error", err)
 		return
