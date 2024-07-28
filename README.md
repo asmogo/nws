@@ -77,7 +77,7 @@ The exit node must be set up to make your services reachable via Nostr.
 Configuration should be completed using environment variables.
 Alternatively, you can create a `.env` file in the current working directory with the following content:
 ```
-NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.damus.io'
+NOSTR_RELAYS = 'ws://localhost:6666;wss://relay.domain.com'
 NOSTR_PRIVATE_KEY = "EXITPRIVATEHEX"
 BACKEND_HOST = 'localhost:3338'
 ```
