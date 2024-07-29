@@ -130,6 +130,7 @@ func (e *Exit) createAndStoreCertificateData(ctx context.Context) (*tls.Certific
 	notAfter := notBefore.Add(10 * 365 * 24 * time.Hour)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
+	domain, _ := e.getDomain()
 
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
@@ -141,6 +142,7 @@ func (e *Exit) createAndStoreCertificateData(ctx context.Context) (*tls.Certific
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
+		DNSNames:              []string{domain},
 	}
 
 	certBytes, _ := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
