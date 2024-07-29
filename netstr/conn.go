@@ -251,7 +251,7 @@ func ParseDestinationDomain(destination string) (string, []string, error) {
 		return "", nil, err
 	}
 	if !url.IsDomain {
-		//	return "", nil, fmt.Errorf("destination is not a domain")
+		return "", nil, fmt.Errorf("destination is not a domain")
 	}
 	var subdomains []string
 	split := strings.Split(url.SubName, ".")
