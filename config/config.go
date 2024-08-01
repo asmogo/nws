@@ -10,8 +10,9 @@ import (
 )
 
 type EntryConfig struct {
-	NostrRelays   []string `env:"NOSTR_RELAYS" envSeparator:";"`
-	PublicAddress string   `env:"PUBLIC_ADDRESS"`
+	NostrRelays       []string `env:"NOSTR_RELAYS" envSeparator:";"`
+	PublicAddress     string   `env:"PUBLIC_ADDRESS"`
+	PublicAddressBind string   `env:"PUBLIC_ADDRESS_BIND"`
 }
 
 type ExitConfig struct {
