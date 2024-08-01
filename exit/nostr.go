@@ -3,6 +3,8 @@ package exit
 import (
 	"context"
 	"log/slog"
+	"strconv"
+	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -11,26 +13,37 @@ func (e *Exit) announceExitNode(ctx context.Context) error {
 	if !e.config.Public {
 		return nil
 	}
-	// create a event
-	event := nostr.Event{
-		PubKey:    e.publicKey,
-		CreatedAt: nostr.Now(),
-		Kind:      nostr.KindTextNote,
-		Content:   "",
-		Tags:      nostr.Tags{nostr.Tag{"n", "nws"}},
-	}
-	err := event.Sign(e.config.NostrPrivateKey)
-	if err != nil {
-		return err
-	}
-	// publish the event
-	for _, relay := range e.relays {
-		err = relay.Publish(ctx, event)
-		if err != nil {
-			slog.Error("could not publish event", "error", err)
-			// do not return here, try to publish the event to other relays
+
+	go func() {
+		for {
+			time.Sleep(time.Second * 10)
+			// create update event
+			// create a event
+
+			event := nostr.Event{
+				PubKey:    e.publicKey,
+				CreatedAt: nostr.Now(),
+				Kind:      nostr.KindTextNote,
+				Content:   "",
+				Tags:      nostr.Tags{nostr.Tag{"n", "nws"}, nostr.Tag{"expiration", strconv.FormatInt(time.Now().Add(time.Second*10).Unix(), 20)}},
+			}
+
+			err := event.Sign(e.config.NostrPrivateKey)
+			if err != nil {
+				slog.Error("could not sign event", "error", err)
+				continue
+			}
+			// publish the event
+			for _, relay := range e.relays {
+				err = relay.Publish(ctx, event)
+				if err != nil {
+					slog.Error("could not publish event", "error", err)
+					// do not return here, try to publish the event to other relays
+				}
+			}
 		}
-	}
+	}()
+
 	return nil
 }
 

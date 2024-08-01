@@ -34,7 +34,7 @@ const (
 )
 
 var (
-	unrecognizedAddrType = fmt.Errorf("Unrecognized address type")
+	unrecognizedAddrType = fmt.Errorf("unrecognized address type")
 )
 
 // AddressRewriter is used to rewrite a destination transparently
@@ -96,7 +96,7 @@ func NewRequest(bufConn io.Reader) (*Request, error) {
 	// Read the version byte
 	header := []byte{0, 0, 0}
 	if _, err := io.ReadAtLeast(bufConn, header, 3); err != nil {
-		return nil, fmt.Errorf("Failed to get command version: %v", err)
+		return nil, fmt.Errorf("failed to get command version: %w", err)
 	}
 
 	// Ensure we are compatible
@@ -129,9 +129,9 @@ func (s *Server) handleRequest(req *Request, conn net.Conn) error {
 		ctx_, addr, err := s.config.Resolver.Resolve(ctx, dest.FQDN)
 		if err != nil {
 			if err := SendReply(conn, hostUnreachable, nil); err != nil {
-				return fmt.Errorf("Failed to send reply: %v", err)
+				return fmt.Errorf("failed to send reply: %w", err)
 			}
-			return fmt.Errorf("Failed to resolve destination '%v': %v", dest.FQDN, err)
+			return fmt.Errorf("failed to resolve destination '%v': %w", dest.FQDN, err)
 		}
 		ctx = ctx_
 		dest.IP = addr
@@ -162,7 +162,7 @@ func (s *Server) handleRequest(req *Request, conn net.Conn) error {
 		return s.handleAssociate(ctx, conn, req)
 	default:
 		if err := SendReply(conn, commandNotSupported, nil); err != nil {
-			return fmt.Errorf("failed to send reply: %v", err)
+			return fmt.Errorf("failed to send reply: %w", err)
 		}
 		return fmt.Errorf("unsupported command: %d", req.Command)
 	}
@@ -173,9 +173,9 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request,
 	// Check if this is allowed
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := SendReply(conn, ruleFailure, nil); err != nil {
-			return fmt.Errorf("Failed to send reply: %v", err)
+			return fmt.Errorf("failed to send reply: %w", err)
 		}
-		return fmt.Errorf("Connect to %v blocked by rules", req.DestAddr)
+		return fmt.Errorf("connect to %v blocked by rules", req.DestAddr)
 	} else {
 		ctx = ctx_
 	}
@@ -214,7 +214,7 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request,
 	local := target.LocalAddr().(*net.TCPAddr)
 	bind := AddrSpec{IP: local.IP, Port: local.Port}
 	if err := SendReply(conn, successReply, &bind); err != nil {
-		return fmt.Errorf("failed to send reply: %v", err)
+		return fmt.Errorf("failed to send reply: %w", err)
 	}
 	// read
 	if options.MessageType == protocol.MessageConnectReverse {
@@ -244,7 +244,7 @@ func (s *Server) handleBind(ctx context.Context, conn net.Conn, req *Request) er
 	// Check if this is allowed
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := SendReply(conn, ruleFailure, nil); err != nil {
-			return fmt.Errorf("Failed to send reply: %v", err)
+			return fmt.Errorf("failed to send reply: %w", err)
 		}
 		return fmt.Errorf("Bind to %v blocked by rules", req.DestAddr)
 	} else {
@@ -253,7 +253,7 @@ func (s *Server) handleBind(ctx context.Context, conn net.Conn, req *Request) er
 
 	// TODO: Support bind
 	if err := SendReply(conn, commandNotSupported, nil); err != nil {
-		return fmt.Errorf("Failed to send reply: %v", err)
+		return fmt.Errorf("failed to send reply: %w", err)
 	}
 	return nil
 }
@@ -263,16 +263,16 @@ func (s *Server) handleAssociate(ctx context.Context, conn net.Conn, req *Reques
 	// Check if this is allowed
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := SendReply(conn, ruleFailure, nil); err != nil {
-			return fmt.Errorf("Failed to send reply: %v", err)
+			return fmt.Errorf("failed to send reply: %w", err)
 		}
-		return fmt.Errorf("Associate to %v blocked by rules", req.DestAddr)
+		return fmt.Errorf("associate to %v blocked by rules", req.DestAddr)
 	} else {
 		ctx = ctx_
 	}
 
 	// TODO: Support associate
 	if err := SendReply(conn, commandNotSupported, nil); err != nil {
-		return fmt.Errorf("Failed to send reply: %v", err)
+		return fmt.Errorf("failed to send reply: %w", err)
 	}
 	return nil
 }
@@ -357,7 +357,7 @@ func SendReply(w io.Writer, resp uint8, addr *AddrSpec) error {
 		addrPort = uint16(addr.Port)
 
 	default:
-		return fmt.Errorf("Failed to format address: %v", addr)
+		return fmt.Errorf("failed to format address: %v", addr)
 	}
 
 	// Format the message
