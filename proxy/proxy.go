@@ -26,12 +26,15 @@ func New(ctx context.Context, config *config.EntryConfig) *Proxy {
 	socksServer, err := socks5.New(&socks5.Config{
 		AuthMethods: nil,
 		Credentials: nil,
-		Resolver:    netstr.NostrDNS{},
-		Rules:       nil,
-		Rewriter:    nil,
-		BindIP:      net.IP{0, 0, 0, 0},
-		Logger:      nil,
-		Dial:        nil,
+		Resolver: netstr.NostrDNS{
+			Pool:        s.pool,
+			NostrRelays: config.NostrRelays,
+		},
+		Rules:    nil,
+		Rewriter: nil,
+		BindIP:   net.IP{0, 0, 0, 0},
+		Logger:   nil,
+		Dial:     nil,
 	}, s.pool, config)
 	if err != nil {
 		panic(err)

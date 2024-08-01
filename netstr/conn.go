@@ -62,7 +62,9 @@ type NostrConnection struct {
 	sentBytes [][]byte
 
 	// sub represents a boolean value indicating if a connection should subscribe to a response when writing.
-	sub bool
+	sub             bool
+	defaultRelays   []string
+	targetPublicKey string
 }
 
 // WriteNostrEvent writes the incoming event to the subscription channel of the NostrConnection.
@@ -149,8 +151,8 @@ func (nc *NostrConnection) handleNostrRead(b []byte, n int) (int, error) {
 // Write writes data to the connection.
 // It delegates the writing logic to handleNostrWrite method.
 // The number of bytes written and error (if any) are returned.
-func (nc *NostrConnection) Write(b []byte) (n int, err error) {
-	return nc.handleNostrWrite(b, err)
+func (nc *NostrConnection) Write(b []byte) (int, error) {
+	return nc.handleNostrWrite(b)
 }
 
 // handleNostrWrite handles the writing of a Nostr event.
@@ -158,10 +160,9 @@ func (nc *NostrConnection) Write(b []byte) (n int, err error) {
 // creates a message signer, creates message options, signs the event,
 // publishes the event to relays, and appends the sent bytes to the connection's sentBytes array.
 // The method returns the number of bytes written and any error that occurred.
-func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
+func (nc *NostrConnection) handleNostrWrite(b []byte) (int, error) {
 	// check if we have already sent this event
-
-	publicKey, relays, err := ParseDestination(nc.dst)
+	publicKey, relays, err := nc.parseDestination()
 	if err != nil {
 		return 0, err
 	}
@@ -173,9 +174,15 @@ func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
 	opts := []protocol.MessageOption{
 		protocol.WithUUID(nc.uuid),
 		protocol.WithType(protocol.MessageTypeSocks5),
+		protocol.WithDestination(nc.dst),
 		protocol.WithData(b),
 	}
-	ev, err := signer.CreateSignedEvent(publicKey, protocol.KindEphemeralEvent, nostr.Tags{nostr.Tag{"p", publicKey}}, opts...)
+	ev, err := signer.CreateSignedEvent(
+		publicKey,
+		protocol.KindEphemeralEvent,
+		nostr.Tags{nostr.Tag{"p", publicKey}},
+		opts...,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -190,12 +197,16 @@ func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
 		now := nostr.Now()
 		incomingEventChannel := nc.pool.SubMany(nc.ctx, relays,
 			nostr.Filters{
-				{Kinds: []int{protocol.KindEphemeralEvent},
+				{
+					Kinds:   []int{protocol.KindEphemeralEvent},
 					Authors: []string{publicKey},
 					Since:   &now,
 					Tags: nostr.TagMap{
 						"p": []string{ev.PubKey},
-					}}})
+					},
+				},
+			},
+		)
 		nc.subscriptionChan = incomingEventChannel
 	}
 	for _, responseRelay := range relays {
@@ -214,44 +225,58 @@ func (nc *NostrConnection) handleNostrWrite(b []byte, err error) (int, error) {
 	return len(b), nil
 }
 
-// ParseDestination takes a destination string and returns a public key and relays.
+// parseDestination takes a destination string and returns a public key and relays.
 // The destination can be "npub" or "nprofile".
 // If the prefix is "npub", the public key is extracted.
 // If the prefix is "nprofile", the public key and relays are extracted.
 // Returns the public key, relays (if any), and any error encountered.
-func ParseDestination(destination string) (string, []string, error) {
+func (nc *NostrConnection) parseDestination() (string, []string, error) {
 	// check if destination ends with .nostr
-	if strings.HasSuffix(destination, ".nostr") {
-		return ParseDestinationDomain(destination)
-	}
-	// destination can be npub or nprofile
-	prefix, pubKey, err := nip19.Decode(destination)
+	if strings.HasPrefix(nc.dst, "npub") || strings.HasPrefix(nc.dst, "nprofile") {
+		// destination can be npub or nprofile
+		prefix, pubKey, err := nip19.Decode(nc.dst)
 
-	if err != nil {
-		return "", nil, err
-	}
+		if err != nil {
+			return "", nil, err
+		}
 
-	var relays []string
-	var publicKey string
+		var relays []string
+		var publicKey string
 
-	switch prefix {
-	case "npub":
-		publicKey = pubKey.(string)
-	case "nprofile":
-		profilePointer := pubKey.(nostr.ProfilePointer)
-		publicKey = profilePointer.PublicKey
-		relays = profilePointer.Relays
+		switch prefix {
+		case "npub":
+			publicKey = pubKey.(string)
+		case "nprofile":
+			profilePointer := pubKey.(nostr.ProfilePointer)
+			publicKey = profilePointer.PublicKey
+			relays = profilePointer.Relays
+		}
+		return publicKey, relays, nil
 	}
-	return publicKey, relays, nil
+	return nc.parseDestinationDomain()
 }
 
-func ParseDestinationDomain(destination string) (string, []string, error) {
-	url, err := protocol.Parse(destination)
+func (nc *NostrConnection) parseDestinationDomain() (string, []string, error) {
+	url, err := protocol.Parse(nc.dst)
 	if err != nil {
 		return "", nil, err
 	}
 	if !url.IsDomain {
+		// try to parse as ip
+		ip := net.ParseIP(url.Name)
+		if ip != nil {
+			return nc.targetPublicKey, nc.defaultRelays, nil
+		}
 		return "", nil, fmt.Errorf("destination is not a domain")
+
+	}
+	if url.TLD != "nostr" {
+		// parse public key
+		/*pubKey,err := nostr.GetPublicKey(nc.privateKey)
+		if err != nil {
+			return "", nil, err
+		}*/
+		return nc.targetPublicKey, nc.defaultRelays, nil
 	}
 	var subdomains []string
 	split := strings.Split(url.SubName, ".")
@@ -309,6 +334,20 @@ type NostrConnOption func(*NostrConnection)
 func WithPrivateKey(privateKey string) NostrConnOption {
 	return func(config *NostrConnection) {
 		config.privateKey = privateKey
+	}
+}
+
+// WithPrivateKey sets the private key for the NostrConnConfig.
+func WithDefaultRelays(defaultRelays []string) NostrConnOption {
+	return func(config *NostrConnection) {
+		config.defaultRelays = defaultRelays
+	}
+}
+
+// WithTargetPublicKey sets the private key for the NostrConnConfig.
+func WithTargetPublicKey(pubKey string) NostrConnOption {
+	return func(config *NostrConnection) {
+		config.targetPublicKey = pubKey
 	}
 }
 

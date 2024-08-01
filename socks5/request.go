@@ -60,6 +60,9 @@ func (a *AddrSpec) String() string {
 // Address returns a string suitable to dial; prefer returning IP-based
 // address, fallback to FQDN
 func (a AddrSpec) Address() string {
+	if a.IP == nil {
+		return a.FQDN
+	}
 	if 0 != len(a.IP) {
 		return net.JoinHostPort(a.IP.String(), strconv.Itoa(a.Port))
 	}
@@ -121,6 +124,7 @@ func (s *Server) handleRequest(req *Request, conn net.Conn) error {
 
 	// Resolve the address if we have a FQDN
 	dest := req.DestAddr
+	var targetPublicKey string
 	if dest.FQDN != "" {
 		ctx_, addr, err := s.config.Resolver.Resolve(ctx, dest.FQDN)
 		if err != nil {
@@ -131,6 +135,9 @@ func (s *Server) handleRequest(req *Request, conn net.Conn) error {
 		}
 		ctx = ctx_
 		dest.IP = addr
+		if pubKey := ctx.Value("publicKey"); pubKey != nil {
+			targetPublicKey = pubKey.(string)
+		}
 	}
 
 	// Apply any address rewrites
@@ -142,7 +149,13 @@ func (s *Server) handleRequest(req *Request, conn net.Conn) error {
 	// Switch on the command
 	switch req.Command {
 	case ConnectCommand:
-		return s.handleConnect(ctx, conn, req)
+		options := netstr.DialOptions{
+			Pool:            s.pool,
+			PublicAddress:   s.config.entryConfig.PublicAddress,
+			ConnectionID:    uuid.New(),
+			TargetPublicKey: targetPublicKey,
+		}
+		return s.handleConnect(ctx, conn, req, options)
 	case BindCommand:
 		return s.handleBind(ctx, conn, req)
 	case AssociateCommand:
@@ -156,7 +169,7 @@ func (s *Server) handleRequest(req *Request, conn net.Conn) error {
 }
 
 // handleConnect is used to handle a connect command
-func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request) error {
+func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request, options netstr.DialOptions) error {
 	// Check if this is allowed
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := SendReply(conn, ruleFailure, nil); err != nil {
@@ -168,23 +181,20 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request)
 	}
 	ch := make(chan net.Conn)
 	// Attempt to connect
-	connectionID := uuid.New()
-	options := netstr.DialOptions{
-		Pool:          s.pool,
-		PublicAddress: s.config.entryConfig.PublicAddress,
-		ConnectionID:  connectionID,
-	}
+
 	dial := s.config.Dial
 	if dial == nil {
 		if s.tcpListener != nil {
-			s.tcpListener.AddConnectChannel(connectionID, ch)
+			s.tcpListener.AddConnectChannel(options.ConnectionID, ch)
 			options.MessageType = protocol.MessageConnectReverse
 		} else {
 			options.MessageType = protocol.MessageConnect
 		}
-		dial = netstr.DialSocks(options)
+
+		dial = netstr.DialSocks(options, s.config.entryConfig)
 	}
-	target, err := dial(ctx, "tcp", req.realDestAddr.FQDN)
+
+	target, err := dial(ctx, "tcp", req.realDestAddr.Address())
 	if err != nil {
 		msg := err.Error()
 		resp := hostUnreachable

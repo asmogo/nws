@@ -14,10 +14,11 @@ var (
 )
 
 type Message struct {
-	Key         uuid.UUID   `json:"key,omitempty"`
-	Type        MessageType `json:"type,omitempty"`
-	Data        []byte      `json:"data,omitempty"`
-	Destination string      `json:"destination,omitempty"`
+	Key                uuid.UUID   `json:"key,omitempty"`
+	Type               MessageType `json:"type,omitempty"`
+	Data               []byte      `json:"data,omitempty"`
+	Destination        string      `json:"destination,omitempty"`
+	EntryPublicAddress string      `json:"entryPublicAddress,omitempty"`
 }
 
 type MessageOption func(*Message)
@@ -33,9 +34,16 @@ func WithType(messageType MessageType) MessageOption {
 		m.Type = messageType
 	}
 }
+
 func WithDestination(destination string) MessageOption {
 	return func(m *Message) {
 		m.Destination = destination
+	}
+}
+
+func WithEntryPublicAddress(entryPublicAddress string) MessageOption {
+	return func(m *Message) {
+		m.EntryPublicAddress = entryPublicAddress
 	}
 }
 func WithData(data []byte) MessageOption {

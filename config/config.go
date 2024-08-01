@@ -21,6 +21,7 @@ type ExitConfig struct {
 	BackendScheme   string   `env:"BACKEND_SCHEME"`
 	HttpsPort       int32
 	HttpsTarget     string
+	Public          bool `env:"PUBLIC"`
 }
 
 // load the and marshal Configuration from .env file from the UserHomeDir
