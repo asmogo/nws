@@ -13,19 +13,16 @@ func (e *Exit) announceExitNode(ctx context.Context) error {
 	if !e.config.Public {
 		return nil
 	}
-
 	go func() {
 		for {
-			time.Sleep(time.Second * 10)
-			// create update event
-			// create a event
-
 			event := nostr.Event{
 				PubKey:    e.publicKey,
 				CreatedAt: nostr.Now(),
 				Kind:      nostr.KindTextNote,
-				Content:   "",
-				Tags:      nostr.Tags{nostr.Tag{"n", "nws"}, nostr.Tag{"expiration", strconv.FormatInt(time.Now().Add(time.Second*10).Unix(), 20)}},
+				Tags: nostr.Tags{
+					nostr.Tag{"n", "nws"},
+					nostr.Tag{"expiration", strconv.FormatInt(time.Now().Add(time.Second*10).Unix(), 20)},
+				},
 			}
 
 			err := event.Sign(e.config.NostrPrivateKey)
@@ -41,9 +38,9 @@ func (e *Exit) announceExitNode(ctx context.Context) error {
 					// do not return here, try to publish the event to other relays
 				}
 			}
+			time.Sleep(time.Second * 10)
 		}
 	}()
-
 	return nil
 }
 
