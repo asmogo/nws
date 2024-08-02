@@ -10,8 +10,9 @@ import (
 )
 
 type EntryConfig struct {
-	NostrRelays   []string `env:"NOSTR_RELAYS" envSeparator:";"`
-	PublicAddress string   `env:"PUBLIC_ADDRESS"`
+	NostrRelays       []string `env:"NOSTR_RELAYS" envSeparator:";"`
+	PublicAddress     string   `env:"PUBLIC_ADDRESS"`
+	PublicAddressBind string   `env:"PUBLIC_ADDRESS_BIND"`
 }
 
 type ExitConfig struct {
@@ -21,6 +22,7 @@ type ExitConfig struct {
 	BackendScheme   string   `env:"BACKEND_SCHEME"`
 	HttpsPort       int32
 	HttpsTarget     string
+	Public          bool `env:"PUBLIC"`
 }
 
 // load the and marshal Configuration from .env file from the UserHomeDir

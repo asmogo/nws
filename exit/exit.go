@@ -61,6 +61,12 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 		// generate new private key
 		exitNodeConfig.NostrPrivateKey = nostr.GeneratePrivateKey()
 		slog.Warn(generateKeyMessage, "key", exitNodeConfig.NostrPrivateKey)
+	} else {
+		pubKey, err := nostr.GetPublicKey(exitNodeConfig.NostrPrivateKey)
+		if err != nil {
+			panic(err)
+		}
+		slog.Info("using public key", "key", pubKey)
 	}
 	// get public key from private key
 	pubKey, err := nostr.GetPublicKey(exitNodeConfig.NostrPrivateKey)
@@ -114,6 +120,10 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	slog.Info("created exit node", "profile", profile, "domain", domain)
 	// setup subscriptions
 	err = exit.setSubscriptions(ctx)
+	if err != nil {
+		panic(err)
+	}
+	err = exit.announceExitNode(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -235,6 +245,13 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 		slog.Error("could not unmarshal message")
 		return
 	}
+	destination, err := protocol.Parse(protocolMessage.Destination)
+	if err != nil {
+		return
+	}
+	if destination.TLD == "nostr" {
+		protocolMessage.Destination = e.config.BackendHost
+	}
 	switch protocolMessage.Type {
 	case protocol.MessageConnect:
 		e.handleConnect(ctx, msg, protocolMessage)
@@ -268,8 +285,9 @@ func (e *Exit) handleConnect(
 		netstr.WithDst(receiver),
 		netstr.WithUUID(protocolMessage.Key),
 	)
+
 	var dst net.Conn
-	dst, err = net.Dial("tcp", e.config.BackendHost)
+	dst, err = net.Dial("tcp", protocolMessage.Destination)
 	if err != nil {
 		slog.Error("could not connect to backend", "error", err)
 		return
@@ -282,16 +300,11 @@ func (e *Exit) handleConnect(
 }
 
 func (e *Exit) handleConnectReverse(protocolMessage *protocol.Message) {
+
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
-	connection, err := net.Dial("tcp", protocolMessage.Destination)
+	connection, err := net.Dial("tcp", protocolMessage.EntryPublicAddress)
 	if err != nil {
-		return
-	}
-	var dst net.Conn
-	dst, err = net.Dial("tcp", e.config.BackendHost)
-	if err != nil {
-		slog.Error("could not connect to backend", "error", err)
 		return
 	}
 
@@ -299,6 +312,22 @@ func (e *Exit) handleConnectReverse(protocolMessage *protocol.Message) {
 	if err != nil {
 		return
 	}
+	// read single byte from the connection
+	readbuffer := make([]byte, 1)
+	_, err = connection.Read(readbuffer)
+	if err != nil {
+		return
+	}
+	if readbuffer[0] != 1 {
+		return
+	}
+	var dst net.Conn
+	dst, err = net.Dial("tcp", protocolMessage.Destination)
+	if err != nil {
+		slog.Error("could not connect to backend", "error", err)
+		return
+	}
+
 	go socks5.Proxy(dst, connection, nil)
 	go socks5.Proxy(connection, dst, nil)
 }

@@ -26,7 +26,7 @@ func New(ctx context.Context, config *config.EntryConfig) *Proxy {
 	socksServer, err := socks5.New(&socks5.Config{
 		AuthMethods: nil,
 		Credentials: nil,
-		Resolver:    netstr.NostrDNS{},
+		Resolver:    netstr.NewNostrDNS(s.pool, config.NostrRelays),
 		Rules:       nil,
 		Rewriter:    nil,
 		BindIP:      net.IP{0, 0, 0, 0},

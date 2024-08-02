@@ -49,13 +49,14 @@ func (l *TCPListener) handleConnection(conn net.Conn) {
 		if err != nil {
 			return
 		}
-
 		// check if uuid is in the map
 		ch, ok := l.connectChannels.Load(string(readbuffer))
 		if !ok {
 			slog.Error("uuid not found in map")
-			return
+			continue
 		}
+		slog.Info("uuid found in map")
+		conn.Write([]byte{1})
 		// send the connection to the channel
 		ch <- conn
 		return
