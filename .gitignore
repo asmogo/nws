@@ -1,4 +1,5 @@
 localhost.crt
 localhost.key
 .idea
+.vscode
 nostr
