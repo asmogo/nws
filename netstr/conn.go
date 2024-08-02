@@ -137,7 +137,7 @@ func (nc *NostrConnection) handleNostrRead(b []byte, n int) (int, error) {
 			if err != nil {
 				return 0, err
 			}
-			slog.Info("reading", slog.String("event", event.ID), slog.String("content", base64.StdEncoding.EncodeToString(message.Data)))
+			slog.Debug("reading", slog.String("event", event.ID), slog.String("content", base64.StdEncoding.EncodeToString(message.Data)))
 			n = copy(b, message.Data)
 			return n, nil
 		case <-nc.ctx.Done():
@@ -221,7 +221,7 @@ func (nc *NostrConnection) handleNostrWrite(b []byte) (int, error) {
 		}
 	}
 	nc.sentBytes = append(nc.sentBytes, b)
-	slog.Info("writing", slog.String("event", ev.ID), slog.String("content", base64.StdEncoding.EncodeToString(b)))
+	slog.Debug("writing", slog.String("event", ev.ID), slog.String("content", base64.StdEncoding.EncodeToString(b)))
 	return len(b), nil
 }
 
