@@ -1,9 +1,11 @@
 package protocol
 
 import (
+	"fmt"
+	"log/slog"
+
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip04"
-	"log/slog"
 )
 
 // KindEphemeralEvent represents the unique identifier for ephemeral events.
@@ -22,7 +24,7 @@ func NewEventSigner(privateKey string) (*EventSigner, error) {
 	myPublicKey, err := nostr.GetPublicKey(privateKey)
 	if err != nil {
 		slog.Error("could not generate pubkey")
-		return nil, err
+		return nil, fmt.Errorf("could not generate public key: %w", err)
 	}
 	signer := &EventSigner{
 		privateKey: privateKey,
@@ -32,7 +34,7 @@ func NewEventSigner(privateKey string) (*EventSigner, error) {
 }
 
 // CreateEvent creates a new Event with the provided tags. The Public Key and the
-// current timestamp are set automatically. The Kind is set to KindEphemeralEvent.
+// current timestamp are set automatically. The Kind is set to KindEphemeralEvent
 func (s *EventSigner) CreateEvent(kind int, tags nostr.Tags) nostr.Event {
 	return nostr.Event{
 		PubKey:    s.PublicKey,
@@ -49,26 +51,34 @@ func (s *EventSigner) CreateEvent(kind int, tags nostr.Tags) nostr.Event {
 // The method then calls CreateEvent to create a new unsigned event with the provided tags.
 // The encrypted message is set as the content of the event.
 // Finally, the event is signed with the private key of the EventSigner, setting the event ID and event Sig fields.
-// The signed event is returned along with any error that occurs.
-func (s *EventSigner) CreateSignedEvent(targetPublicKey string, kind int, tags nostr.Tags, opts ...MessageOption) (nostr.Event, error) {
+// The signed event is returned along with any error that occurs
+func (s *EventSigner) CreateSignedEvent(
+	targetPublicKey string,
+	kind int,
+	tags nostr.Tags,
+	opts ...MessageOption,
+) (nostr.Event, error) {
 	sharedKey, err := nip04.ComputeSharedSecret(targetPublicKey, s.privateKey)
 	if err != nil {
-		return nostr.Event{}, err
+		return nostr.Event{}, fmt.Errorf("could not compute shared key: %w", err)
 	}
 	message := NewMessage(
 		opts...,
 	)
-	messageJson, err := MarshalJSON(message)
+	messageJSON, err := MarshalJSON(message)
 	if err != nil {
-		return nostr.Event{}, err
+		return nostr.Event{}, fmt.Errorf("could not marshal message: %w", err)
 	}
-	encryptedMessage, err := nip04.Encrypt(string(messageJson), sharedKey)
-	ev := s.CreateEvent(kind, tags)
-	ev.Content = encryptedMessage
+	encryptedMessage, err := nip04.Encrypt(string(messageJSON), sharedKey)
+	if err != nil {
+		return nostr.Event{}, fmt.Errorf("could not encrypt message: %w", err)
+	}
+	event := s.CreateEvent(kind, tags)
+	event.Content = encryptedMessage
 	// calling Sign sets the event ID field and the event Sig field
-	err = ev.Sign(s.privateKey)
+	err = event.Sign(s.privateKey)
 	if err != nil {
-		return nostr.Event{}, err
+		return nostr.Event{}, fmt.Errorf("could not sign event: %w", err)
 	}
-	return ev, nil
+	return event, nil
 }
