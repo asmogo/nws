@@ -10,6 +10,8 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
+const ten = 10
+
 func (e *Exit) announceExitNode(ctx context.Context) error {
 	if !e.config.Public {
 		return nil
@@ -21,10 +23,9 @@ func (e *Exit) announceExitNode(ctx context.Context) error {
 				CreatedAt: nostr.Now(),
 				Kind:      protocol.KindAnnouncementEvent,
 				Tags: nostr.Tags{
-					nostr.Tag{"expiration", strconv.FormatInt(time.Now().Add(time.Second*10).Unix(), 20)},
+					nostr.Tag{"expiration", strconv.FormatInt(time.Now().Add(time.Second*ten).Unix(), ten)},
 				},
 			}
-
 			err := event.Sign(e.config.NostrPrivateKey)
 			if err != nil {
 				slog.Error("could not sign event", "error", err)
@@ -38,7 +39,7 @@ func (e *Exit) announceExitNode(ctx context.Context) error {
 					// do not return here, try to publish the event to other relays
 				}
 			}
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * ten)
 		}
 	}()
 	return nil
