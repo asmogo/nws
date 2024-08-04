@@ -15,7 +15,7 @@ Exit node [domain names](#nws-domain-names) make private services accessible to 
 ### NWS main components
 
 1. **Exit node**: A TCP reverse proxy that listens for incoming Nostr subscriptions and forwards the payload to your designated backend service.
-2. **Entry node**: Forwards TCP packets to the exit node using a SOCKS proxy and creates encrypted events for the exit node.
+2. **Entry node**: A SOCKS5 proxy that forwards TCP packets and creates encrypted events for the exit node.
 
 <img src="nws.png" width="900"/>
 
@@ -117,5 +117,5 @@ If you don't want to use the `PUBLIC_ADDRESS` feature, no further configuration 
 PUBLIC_ADDRESS='<public_ip>:<port>'
 ```
 
-- `PUBLIC_ADDRESS`: This can be set if the entry node is publicly available. When set, the entry node will additionally bind to this address. Exit node discovery will still be done using Nostr. Once a connection is established, this public address will be used to transmit further data.
+- `PUBLIC_ADDRESS`: This can be set if the entry node is publicly available. Exit node discovery will still be done using Nostr. Once a connection is established, this public address will be used to transmit further data. (`<ip/domain>:<port>`)
 - `NOSTR_RELAYS`: A list of Nostr relays to publish events to. Used only if there is no relay data in the request.
