@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/asmogo/nws/protocol"
 	"github.com/nbd-wtf/go-nostr"
 )
 
@@ -18,9 +19,8 @@ func (e *Exit) announceExitNode(ctx context.Context) error {
 			event := nostr.Event{
 				PubKey:    e.publicKey,
 				CreatedAt: nostr.Now(),
-				Kind:      nostr.KindTextNote,
+				Kind:      protocol.KindAnnouncementEvent,
 				Tags: nostr.Tags{
-					nostr.Tag{"n", "nws"},
 					nostr.Tag{"expiration", strconv.FormatInt(time.Now().Add(time.Second*10).Unix(), 20)},
 				},
 			}

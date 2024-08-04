@@ -9,7 +9,16 @@ import (
 )
 
 // KindEphemeralEvent represents the unique identifier for ephemeral events.
-const KindEphemeralEvent int = 38333
+const KindEphemeralEvent int = 28333
+
+// KindAnnouncementEvent represents the unique identifier for announcement events.
+const KindAnnouncementEvent int = 38333
+
+// KindCertificateEvent represents the unique identifier for certificate events.
+const KindCertificateEvent int = 38334
+
+// KindPrivateKeyEvent represents the unique identifier for private key events.
+const KindPrivateKeyEvent int = 38335
 
 // EventSigner represents a signer that can create and sign events.
 //

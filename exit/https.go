@@ -9,9 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/asmogo/nws/protocol"
-	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip04"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -19,14 +16,18 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/asmogo/nws/protocol"
+	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip04"
 )
 
 func (e *Exit) StartReverseProxy(httpTarget string, port int32) error {
 	ctx := context.Background()
 	ev := e.pool.QuerySingle(ctx, e.config.NostrRelays, nostr.Filter{
 		Authors: []string{e.publicKey},
-		Kinds:   []int{nostr.KindTextNote},
-		Tags:    nostr.TagMap{"p": []string{e.nprofile}},
+		Kinds:   []int{protocol.KindCertificateEvent},
+		Tags:    nostr.TagMap{"p": []string{e.publicKey}},
 	})
 	var cert tls.Certificate
 	if ev == nil {
@@ -40,8 +41,8 @@ func (e *Exit) StartReverseProxy(httpTarget string, port int32) error {
 		// load private key from file
 		privateKeyEvent := e.pool.QuerySingle(ctx, e.config.NostrRelays, nostr.Filter{
 			Authors: []string{e.publicKey},
-			Kinds:   []int{nostr.KindEncryptedDirectMessage},
-			Tags:    nostr.TagMap{"p": []string{e.nprofile}},
+			Kinds:   []int{protocol.KindPrivateKeyEvent},
+			Tags:    nostr.TagMap{"p": []string{e.publicKey}},
 		})
 		if privateKeyEvent == nil {
 			return fmt.Errorf("failed to find encrypted direct message")
@@ -125,7 +126,7 @@ func (e *Exit) createAndStoreCertificateData(ctx context.Context) (*tls.Certific
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 	// save key pem to file
-	err := os.WriteFile(fmt.Sprintf("%s.key", e.nprofile), keyPEM, 0644)
+	err := os.WriteFile(fmt.Sprintf("%s.key", e.publicKey), keyPEM, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +147,8 @@ func (e *Exit) storePrivateKey(ctx context.Context, keyPEM []byte) error {
 	if err != nil {
 		return err
 	}
-	event, err := s.CreateSignedEvent(e.publicKey, nostr.KindEncryptedDirectMessage, nostr.Tags{
-		nostr.Tag{"p", e.nprofile},
+	event, err := s.CreateSignedEvent(e.publicKey, protocol.KindPrivateKeyEvent, nostr.Tags{
+		nostr.Tag{"p", e.publicKey},
 	}, protocol.WithData(keyPEM))
 	if err != nil {
 		return err
@@ -169,10 +170,10 @@ func (e *Exit) storeCertificate(ctx context.Context, certPEM []byte) (*tls.Certi
 	event := nostr.Event{
 		CreatedAt: nostr.Now(),
 		PubKey:    e.publicKey,
-		Kind:      nostr.KindTextNote,
+		Kind:      protocol.KindCertificateEvent,
 		Content:   string(certPEM),
 		Tags: nostr.Tags{
-			nostr.Tag{"p", e.nprofile},
+			nostr.Tag{"p", e.publicKey},
 		},
 	}
 	err := event.Sign(e.config.NostrPrivateKey)

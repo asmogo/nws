@@ -31,9 +31,12 @@ services:
     networks:
       nostr:
     environment:
-      - NOSTR_RELAYS=ws://nostr-relay:8080
+      - NOSTR_RELAYS=ws://nostr-relay:7777
       - NOSTR_PRIVATE_KEY=
       - BACKEND_HOST=mint:3338
+    depends_on:
+      - mint
+      - nostr
   exit-https:
     build:
       context: .
@@ -43,9 +46,12 @@ services:
     networks:
       nostr:
     environment:
-      - NOSTR_RELAYS=ws://nostr-relay:8080
+      - NOSTR_RELAYS=ws://nostr-relay:7777
       - NOSTR_PRIVATE_KEY=
       - BACKEND_HOST=:4443
+    depends_on:
+      - mint
+      - nostr
   entry:
     build:
       context: .
@@ -56,16 +62,17 @@ services:
     networks:
       nostr:
     environment:
-      - NOSTR_RELAYS=ws://nostr-relay:8080
+      - NOSTR_RELAYS=ws://nostr-relay:7777
+    depends_on:
+      - nostr
   nostr:
-    image: scsibug/nostr-rs-relay:latest
+    image: carroarmato0/strfry:latest
     container_name: nostr-relay
     ports:
-      - 8080:8080
+      - 7777:7777
     networks:
       nostr:
     restart: always
     volumes:
-      - ./nostr/data:/usr/src/app/db:Z
-      - ./nostr/config/config.toml:/usr/src/app/config.toml:ro,Z
-    user: 100:100
+      - ./strfry/data:/app/strfry-db/:Z
+      - ./strfry/strfry.conf:/app/strfry.conf:ro,Z

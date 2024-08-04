@@ -3,10 +3,12 @@ package netstr
 import (
 	"context"
 	"fmt"
-	"github.com/nbd-wtf/go-nostr"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/asmogo/nws/protocol"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 // NostrDNS does not resolve anything
@@ -36,9 +38,8 @@ func (d NostrDNS) Resolve(ctx context.Context, name string) (context.Context, ne
 	}
 	since := nostr.Timestamp(time.Now().Add(-time.Second * 10).Unix())
 	ev := d.pool.QuerySingle(ctx, d.nostrRelays, nostr.Filter{
-		Kinds: []int{nostr.KindTextNote},
+		Kinds: []int{protocol.KindAnnouncementEvent},
 		Since: &since,
-		Tags:  nostr.TagMap{"n": []string{"nws"}},
 	})
 	if ev == nil {
 		return ctx, nil, fmt.Errorf("failed to find exit node event")
