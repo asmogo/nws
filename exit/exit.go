@@ -61,15 +61,10 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 		// generate new private key
 		exitNodeConfig.NostrPrivateKey = nostr.GeneratePrivateKey()
 		slog.Warn(generateKeyMessage, "key", exitNodeConfig.NostrPrivateKey)
-	} else {
-		pubKey, err := nostr.GetPublicKey(exitNodeConfig.NostrPrivateKey)
-		if err != nil {
-			panic(err)
-		}
-		slog.Info("using public key", "key", pubKey)
 	}
 	// get public key from private key
 	pubKey, err := nostr.GetPublicKey(exitNodeConfig.NostrPrivateKey)
+	slog.Info("using public key", "key", pubKey)
 	if err != nil {
 		panic(err)
 	}
