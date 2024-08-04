@@ -99,9 +99,14 @@ func New(conf *Config, pool *nostr.SimplePool, config *config.EntryConfig) (*Ser
 		pool:   pool,
 	}
 	if conf.entryConfig.PublicAddress != "" {
-		listener, err := NewTCPListener(conf.entryConfig.PublicAddressBind)
+		// parse host port
+		_, port, err := net.SplitHostPort(conf.entryConfig.PublicAddress)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse public address: %w", err)
+		}
+		listener, err := NewTCPListener(net.JoinHostPort(net.IP{0, 0, 0, 0}.String(), port))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tcp listener: %w", err)
 		}
 		go listener.Start()
 		server.tcpListener = listener
@@ -114,6 +119,7 @@ func New(conf *Config, pool *nostr.SimplePool, config *config.EntryConfig) (*Ser
 
 	return server, nil
 }
+
 func (s *Server) Configuration() (*Config, error) {
 	if s.config != nil {
 		return s.config, nil
