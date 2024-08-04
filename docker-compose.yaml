@@ -74,5 +74,5 @@ services:
       nostr:
     restart: always
     volumes:
-      - ./nostr/data:/app/strfry-db/:Z
-      - ./nostr/config/strfry.conf:/app/strfry.conf:ro,Z
+      - ./strfry/data:/app/strfry-db/:Z
+      - ./strfry/strfry.conf:/app/strfry.conf:ro,Z
