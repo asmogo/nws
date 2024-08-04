@@ -1,10 +1,12 @@
 package socks5
 
 import (
-	"github.com/google/uuid"
-	"github.com/puzpuzpuz/xsync/v3"
+	"fmt"
 	"log/slog"
 	"net"
+
+	"github.com/google/uuid"
+	"github.com/puzpuzpuz/xsync/v3"
 )
 
 type TCPListener struct {
@@ -12,10 +14,12 @@ type TCPListener struct {
 	connectChannels *xsync.MapOf[string, chan net.Conn] // todo -- use [16]byte for uuid instead of string
 }
 
+const uuidLength = 36
+
 func NewTCPListener(address string) (*TCPListener, error) {
 	l, err := net.Listen("tcp", address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
 	}
 	return &TCPListener{
 		listener:        l,
@@ -39,26 +43,34 @@ func (l *TCPListener) Start() {
 }
 
 // handleConnection handles the connection
+// It reads the uuid from the connection, checks if the uuid is in the map, and sends the connection to the channel
+// It does not close the connection
 func (l *TCPListener) handleConnection(conn net.Conn) {
-	//defer conn.Close()
+	response := []byte{1}
 	for {
 		// read uuid from the connection
-		readbuffer := make([]byte, 36)
-
+		readbuffer := make([]byte, uuidLength)
 		_, err := conn.Read(readbuffer)
 		if err != nil {
 			return
 		}
 		// check if uuid is in the map
-		ch, ok := l.connectChannels.Load(string(readbuffer))
+		connectionID := string(readbuffer)
+		connChannel, ok := l.connectChannels.Load(connectionID)
 		if !ok {
 			slog.Error("uuid not found in map")
 			continue
 		}
 		slog.Info("uuid found in map")
-		conn.Write([]byte{1})
+		l.connectChannels.Delete(connectionID)
+		_, err = conn.Write(response)
+		if err != nil {
+			close(connChannel) // close the channel
+			slog.Error("failed to write response to connection", "err", err)
+			return
+		}
 		// send the connection to the channel
-		ch <- conn
+		connChannel <- conn
 		return
 	}
 }
