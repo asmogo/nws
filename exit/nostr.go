@@ -19,9 +19,10 @@ func (e *Exit) announceExitNode(ctx context.Context) error {
 			event := nostr.Event{
 				PubKey:    e.publicKey,
 				CreatedAt: nostr.Now(),
-				Kind:      protocol.KindAnnouncementEvent,
+
+				Kind: protocol.KindAnnouncementEvent,
 				Tags: nostr.Tags{
-					nostr.Tag{"expiration", strconv.FormatInt(time.Now().Add(time.Second*10).Unix(), 20)},
+					nostr.Tag{"expiration", strconv.FormatInt(time.Now().Add(time.Second*10).Unix(), 10)},
 				},
 			}
 
