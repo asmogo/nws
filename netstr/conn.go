@@ -6,7 +6,13 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"log/slog"
+	"net"
+	"strings"
+	"time"
+
 	"github.com/asmogo/nws/protocol"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
@@ -14,10 +20,6 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip04"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/samber/lo"
-	"log/slog"
-	"net"
-	"strings"
-	"time"
 )
 
 // NostrConnection implements the net.Conn interface.
@@ -50,13 +52,13 @@ type NostrConnection struct {
 	// It is used to write incoming events which will be read and processed by the Read method.
 	subscriptionChan chan nostr.IncomingEvent
 
-	// readIds represents the list of event IDs that have been read by the NostrConnection object.
-	readIds []string
+	// readIDs represents the list of event IDs that have been read by the NostrConnection object.
+	readIDs []string
 
-	// writeIds is a field of type []string in the NostrConnection struct.
+	// writeIDs is a field of type []string in the NostrConnection struct.
 	// It stores the IDs of the events that have been written to the connection.
 	// This field is used to check if an event has already been written and avoid duplicate writes.
-	writeIds []string
+	writeIDs []string
 
 	// sentBytes is a field that stores the bytes of data that have been sent by the connection.
 	sentBytes [][]byte
@@ -66,6 +68,8 @@ type NostrConnection struct {
 	defaultRelays   []string
 	targetPublicKey string
 }
+
+var errContextCanceled = errors.New("context canceled")
 
 // WriteNostrEvent writes the incoming event to the subscription channel of the NostrConnection.
 // The subscription channel is used by the Read method to read events and handle them.
@@ -78,7 +82,6 @@ func (nc *NostrConnection) WriteNostrEvent(event nostr.IncomingEvent) {
 // NewConnection creates a new NostrConnection object with the provided context and options.
 // It initializes the config with default values, processes the options to customize the config,
 // and creates a new NostrConnection object using the config.
-// The NostrConnection object includes the privateKey, dst, pool, ctx, cancel, sub, subscriptionChan, readIds, and sentBytes fields.
 // If an uuid is provided in the options, it is assigned to the NostrConnection object.
 // The NostrConnection object is then returned.
 func NewConnection(ctx context.Context, opts ...NostrConnOption) *NostrConnection {
@@ -88,7 +91,7 @@ func NewConnection(ctx context.Context, opts ...NostrConnOption) *NostrConnectio
 		ctx:              ctx,
 		cancel:           c,
 		subscriptionChan: make(chan nostr.IncomingEvent),
-		readIds:          make([]string, 0),
+		readIDs:          make([]string, 0),
 		sentBytes:        make([][]byte, 0),
 	}
 	for _, opt := range opts {
@@ -104,8 +107,8 @@ func NewConnection(ctx context.Context, opts ...NostrConnOption) *NostrConnectio
 //
 // The number of bytes read is returned as n and any error encountered is returned as err.
 // The content of the decrypted message is then copied to the provided byte slice b.
-func (nc *NostrConnection) Read(b []byte) (n int, err error) {
-	return nc.handleNostrRead(b, n)
+func (nc *NostrConnection) Read(b []byte) (int, error) {
+	return nc.handleNostrRead(b)
 }
 
 // handleNostrRead reads the incoming events from the subscription channel and processes them.
@@ -113,7 +116,7 @@ func (nc *NostrConnection) Read(b []byte) (n int, err error) {
 // unmarshals the decoded message and copies the content into the provided byte slice.
 // It returns the number of bytes copied and any error encountered.
 // If the context is canceled, it returns an error with "context canceled" message.
-func (nc *NostrConnection) handleNostrRead(b []byte, n int) (int, error) {
+func (nc *NostrConnection) handleNostrRead(buffer []byte) (int, error) {
 	for {
 		select {
 		case event := <-nc.subscriptionChan:
@@ -121,27 +124,30 @@ func (nc *NostrConnection) handleNostrRead(b []byte, n int) (int, error) {
 				return 0, nil
 			}
 			// check if we have already read this event
-			if lo.Contains(nc.readIds, event.ID) {
+			if lo.Contains(nc.readIDs, event.ID) {
 				continue
 			}
-			nc.readIds = append(nc.readIds, event.ID)
+			nc.readIDs = append(nc.readIDs, event.ID)
 			sharedKey, err := nip04.ComputeSharedSecret(event.PubKey, nc.privateKey)
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("could not compute shared key: %w", err)
 			}
 			decodedMessage, err := nip04.Decrypt(event.Content, sharedKey)
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("could not decrypt message: %w", err)
 			}
 			message, err := protocol.UnmarshalJSON([]byte(decodedMessage))
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("could not unmarshal message: %w", err)
 			}
-			slog.Debug("reading", slog.String("event", event.ID), slog.String("content", base64.StdEncoding.EncodeToString(message.Data)))
-			n = copy(b, message.Data)
+			slog.Debug("reading",
+				slog.String("event", event.ID),
+				slog.String("content", base64.StdEncoding.EncodeToString(message.Data)),
+			)
+			n := copy(buffer, message.Data)
 			return n, nil
 		case <-nc.ctx.Done():
-			return 0, fmt.Errorf("context canceled")
+			return 0, errContextCanceled
 		default:
 			time.Sleep(time.Millisecond * 100)
 		}
@@ -155,43 +161,58 @@ func (nc *NostrConnection) Write(b []byte) (int, error) {
 	return nc.handleNostrWrite(b)
 }
 
-// handleNostrWrite handles the writing of a Nostr event.
-// It checks if the event has already been sent, parses the destination,
-// creates a message signer, creates message options, signs the event,
-// publishes the event to relays, and appends the sent bytes to the connection's sentBytes array.
-// The method returns the number of bytes written and any error that occurred.
-func (nc *NostrConnection) handleNostrWrite(b []byte) (int, error) {
-	// check if we have already sent this event
+// Go lang
+func (nc *NostrConnection) handleNostrWrite(buffer []byte) (int, error) {
 	publicKey, relays, err := nc.parseDestination()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not parse destination: %w", err)
 	}
 	signer, err := protocol.NewEventSigner(nc.privateKey)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not create event signer: %w", err)
 	}
-	// create message options
+	signedEvent, err := nc.createSignedEvent(signer, buffer, publicKey, relays)
+	if err != nil {
+		return 0, fmt.Errorf("could not create signed event: %w", err)
+	}
+	err = nc.publishEventToRelays(signedEvent, relays)
+	if err != nil {
+		return 0, fmt.Errorf("could not publish event to relays: %w", err)
+	}
+	nc.appendSentBytes(buffer)
+	slog.Debug("writing",
+		slog.String("event", signedEvent.ID),
+		slog.String("content", base64.StdEncoding.EncodeToString(buffer)),
+	)
+	return len(buffer), nil
+}
+
+func (nc *NostrConnection) createSignedEvent(
+	signer *protocol.EventSigner,
+	b []byte,
+	publicKey string,
+	relays []string,
+) (nostr.Event, error) {
 	opts := []protocol.MessageOption{
 		protocol.WithUUID(nc.uuid),
 		protocol.WithType(protocol.MessageTypeSocks5),
 		protocol.WithDestination(nc.dst),
 		protocol.WithData(b),
 	}
-	ev, err := signer.CreateSignedEvent(
+	signedEvent, err := signer.CreateSignedEvent(
 		publicKey,
 		protocol.KindEphemeralEvent,
 		nostr.Tags{nostr.Tag{"p", publicKey}},
 		opts...,
 	)
 	if err != nil {
-		return 0, err
+		return signedEvent, fmt.Errorf("could not create signed event: %w", err)
 	}
-	if lo.Contains(nc.writeIds, ev.ID) {
-		slog.Info("event already sent", slog.String("event", ev.ID))
-		return 0, nil
+	if lo.Contains(nc.writeIDs, signedEvent.ID) {
+		slog.Info("event already sent", slog.String("event", signedEvent.ID))
+		return signedEvent, nil
 	}
-	nc.writeIds = append(nc.writeIds, ev.ID)
-
+	nc.writeIDs = append(nc.writeIDs, signedEvent.ID)
 	if nc.sub {
 		nc.sub = false
 		now := nostr.Now()
@@ -202,27 +223,33 @@ func (nc *NostrConnection) handleNostrWrite(b []byte) (int, error) {
 					Authors: []string{publicKey},
 					Since:   &now,
 					Tags: nostr.TagMap{
-						"p": []string{ev.PubKey},
+						"p": []string{signedEvent.PubKey},
 					},
 				},
 			},
 		)
 		nc.subscriptionChan = incomingEventChannel
 	}
+	return signedEvent, nil
+}
+
+func (nc *NostrConnection) publishEventToRelays(ev nostr.Event, relays []string) error {
 	for _, responseRelay := range relays {
 		var relay *nostr.Relay
-		relay, err = nc.pool.EnsureRelay(responseRelay)
+		relay, err := nc.pool.EnsureRelay(responseRelay)
 		if err != nil {
-			return 0, err
+			return fmt.Errorf("could not ensure relay: %w", err)
 		}
 		err = relay.Publish(nc.ctx, ev)
 		if err != nil {
-			return 0, err
+			return fmt.Errorf("could not publish event to relay: %w", err)
 		}
 	}
+	return nil
+}
+
+func (nc *NostrConnection) appendSentBytes(b []byte) {
 	nc.sentBytes = append(nc.sentBytes, b)
-	slog.Debug("writing", slog.String("event", ev.ID), slog.String("content", base64.StdEncoding.EncodeToString(b)))
-	return len(b), nil
 }
 
 // parseDestination takes a destination string and returns a public key and relays.
@@ -237,7 +264,7 @@ func (nc *NostrConnection) parseDestination() (string, []string, error) {
 		prefix, pubKey, err := nip19.Decode(nc.dst)
 
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("could not decode destination: %w", err)
 		}
 
 		var relays []string
@@ -278,7 +305,7 @@ func (nc *NostrConnection) parseDestinationDomain() (string, []string, error) {
 		}*/
 		return nc.targetPublicKey, nc.defaultRelays, nil
 	}
-	var subdomains []string
+	subdomains := make([]string, 0)
 	split := strings.Split(url.SubName, ".")
 	for _, subdomain := range split {
 		decodedSubDomain, err := base32.HexEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(subdomain))
@@ -315,15 +342,15 @@ func (nc *NostrConnection) RemoteAddr() net.Addr {
 	return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0}
 }
 
-func (nc *NostrConnection) SetDeadline(t time.Time) error {
+func (nc *NostrConnection) SetDeadline(_ time.Time) error {
 	return nil
 }
 
-func (nc *NostrConnection) SetReadDeadline(t time.Time) error {
+func (nc *NostrConnection) SetReadDeadline(_ time.Time) error {
 	return nil
 }
 
-func (nc *NostrConnection) SetWriteDeadline(t time.Time) error {
+func (nc *NostrConnection) SetWriteDeadline(_ time.Time) error {
 	return nil
 }
 
