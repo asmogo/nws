@@ -23,7 +23,7 @@ Exit node [domain names](#nws-domain-names) make private services accessible to 
 
 There are two types of domain names resolved by NWS entry nodes:
 1. `.nostr` domains, which have base32 encoded public key hostnames and base32 encoded relays as subdomains.
-2. [nprofiles](https://nostr-nips.com/nip-19), which are combinations of a Nostr public key and multiple relays.
+2. [nprofiles](https://nostr-nips.com/nip-19#shareable-identifiers-with-extra-metadata), which are combinations of a Nostr public key and multiple relays.
 
 Both types of domains will be generated and printed in the console on startup
 
@@ -45,7 +45,7 @@ This will start an example environment, including:
 - Exit node
 - Exit node with HTTPS reverse proxy
 - [Cashu Nutshell](https://github.com/cashubtc/nutshell) (backend service)
-- [nostr-relay](https://github.com/scsibug/nostr-rs-relay)
+- [nostr-relay](https://github.com/hoytech/strfry)
 
 You can run the following commands to receive your NWS domain:
 
