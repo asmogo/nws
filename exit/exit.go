@@ -229,10 +229,12 @@ func (e *Exit) ListenAndServe(ctx context.Context) {
 func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 	sharedKey, err := nip04.ComputeSharedSecret(msg.PubKey, e.config.NostrPrivateKey)
 	if err != nil {
+		slog.Error("could not compute shared key", "error", err)
 		return
 	}
 	decodedMessage, err := nip04.Decrypt(msg.Content, sharedKey)
 	if err != nil {
+		slog.Error("could not decrypt message", "error", err)
 		return
 	}
 	protocolMessage, err := protocol.UnmarshalJSON([]byte(decodedMessage))
@@ -242,6 +244,7 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 	}
 	destination, err := protocol.Parse(protocolMessage.Destination)
 	if err != nil {
+		slog.Error("could not parse destination", "error", err)
 		return
 	}
 	if destination.TLD == "nostr" {
@@ -289,17 +292,17 @@ func (e *Exit) handleConnect(
 	}
 
 	e.nostrConnectionMap.Store(protocolMessage.Key.String(), connection)
-
+	slog.Info("connected to backend", "key", protocolMessage.Key)
 	go socks5.Proxy(dst, connection, nil)
 	go socks5.Proxy(connection, dst, nil)
 }
 
 func (e *Exit) handleConnectReverse(protocolMessage *protocol.Message) {
-
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
 	connection, err := net.Dial("tcp", protocolMessage.EntryPublicAddress)
 	if err != nil {
+		slog.Error("could not connect to entry", "error", err)
 		return
 	}
 
@@ -311,6 +314,7 @@ func (e *Exit) handleConnectReverse(protocolMessage *protocol.Message) {
 	readbuffer := make([]byte, 1)
 	_, err = connection.Read(readbuffer)
 	if err != nil {
+		slog.Error("could not read from connection", "error", err)
 		return
 	}
 	if readbuffer[0] != 1 {
@@ -322,7 +326,7 @@ func (e *Exit) handleConnectReverse(protocolMessage *protocol.Message) {
 		slog.Error("could not connect to backend", "error", err)
 		return
 	}
-
+	slog.Info("connected to entry", "key", protocolMessage.Key)
 	go socks5.Proxy(dst, connection, nil)
 	go socks5.Proxy(connection, dst, nil)
 }
@@ -344,4 +348,5 @@ func (e *Exit) handleSocks5ProxyMessage(
 		return
 	}
 	dst.WriteNostrEvent(msg)
+	slog.Info("wrote event to backend", "key", protocolMessage.Key)
 }
