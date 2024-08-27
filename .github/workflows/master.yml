@@ -2,7 +2,9 @@ name: gobuild
 
 on:
   push:
-    branches: [ "master" ]
+    # run only against tags
+    tags:
+      - '*'
 
 jobs:
   docker:
@@ -26,4 +28,4 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: asmogo/nws-exit-node:latest
+          tags: asmogo/nws:latest
