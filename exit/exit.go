@@ -270,7 +270,8 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 func (e *Exit) handleConnect(
 	ctx context.Context,
 	msg nostr.IncomingEvent,
-	protocolMessage *protocol.Message) {
+	protocolMessage *protocol.Message,
+) {
 	e.mutexMap.Lock(protocolMessage.Key.String())
 	defer e.mutexMap.Unlock(protocolMessage.Key.String())
 	receiver, err := nip19.EncodeProfile(msg.PubKey, []string{msg.Relay.String()})
@@ -288,6 +289,7 @@ func (e *Exit) handleConnect(
 	dst, err = net.Dial("tcp", protocolMessage.Destination)
 	if err != nil {
 		slog.Error("could not connect to backend", "error", err)
+		connection.Close()
 		return
 	}
 
@@ -324,6 +326,7 @@ func (e *Exit) handleConnectReverse(protocolMessage *protocol.Message) {
 	dst, err = net.Dial("tcp", protocolMessage.Destination)
 	if err != nil {
 		slog.Error("could not connect to backend", "error", err)
+		connection.Close()
 		return
 	}
 	slog.Info("connected to entry", "key", protocolMessage.Key)
