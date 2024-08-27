@@ -82,7 +82,7 @@ To make your services reachable via Nostr, set up the exit node.
 Configuration can be completed using environment variables. Alternatively, you can create a `.env` file in the current working directory with the following content:
 
 ```
-NOSTR_RELAYS='ws://localhost:6666;wss://relay.domain.com'
+NOSTR_RELAYS='ws://localhost:6666;ws://localhost:7777;wss://relay.domain.com'
 NOSTR_PRIVATE_KEY="EXITPRIVATEHEX"
 BACKEND_HOST='localhost:3338'
 PUBLIC=false
@@ -96,7 +96,7 @@ PUBLIC=false
 To start the exit node, use this command:
 
 ```bash
-go run cmd/exit/exit.go
+go run cmd/nws/nws.go exit
 ```
 
 If your backend services support TLS, your service can now start using TLS encryption through a publicly available entry node.
@@ -108,7 +108,7 @@ If your backend services support TLS, your service can now start using TLS encry
 To run an entry node for accessing NWS services behind exit nodes, use the following command:
 
 ```bash
-go run cmd/entry/main.go
+go run cmd/nws/nws.go entry
 ```
 
 If you don't want to use the `PUBLIC_ADDRESS` feature, no further configuration is needed.

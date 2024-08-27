@@ -24,6 +24,10 @@ type ExitConfig struct {
 	Public          bool `env:"PUBLIC"`
 }
 
+var DefaultRelays = []string{
+	"wss://relay.8333.space",
+}
+
 // load the and marshal Configuration from .env file from the UserHomeDir
 // if this file was not found, fallback to the os environment variables
 func LoadConfig[T any]() (*T, error) {

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"log/slog"
+
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/exit"
+	"github.com/asmogo/nws/proxy"
 	"github.com/spf13/cobra"
 )
 
@@ -12,12 +15,15 @@ const (
 )
 
 func main() {
-
+	rootCmd := &cobra.Command{Use: "nws"}
+	exitCmd := &cobra.Command{Use: "exit", Run: startExitNode}
 	var httpsPort int32
 	var httpTarget string
-	rootCmd := &cobra.Command{Use: "exit", Run: startExitNode}
-	rootCmd.Flags().Int32VarP(&httpsPort, "port", "p", 0, usagePort)
-	rootCmd.Flags().StringVarP(&httpTarget, "target", "t", "", usageTarget)
+	exitCmd.Flags().Int32VarP(&httpsPort, "port", "p", 0, usagePort)
+	exitCmd.Flags().StringVarP(&httpTarget, "target", "t", "", usageTarget)
+	entryCmd := &cobra.Command{Use: "entry", Run: startEntryNode}
+	rootCmd.AddCommand(exitCmd)
+	rootCmd.AddCommand(entryCmd)
 	err := rootCmd.Execute()
 	if err != nil {
 		panic(err)
@@ -26,7 +32,6 @@ func main() {
 
 // updateConfigFlag updates the configuration with the provided flags.
 func updateConfigFlag(cmd *cobra.Command, cfg *config.ExitConfig) error {
-
 	httpsPort, err := cmd.Flags().GetInt32("port")
 	if err != nil {
 		return err
@@ -41,14 +46,39 @@ func updateConfigFlag(cmd *cobra.Command, cfg *config.ExitConfig) error {
 }
 
 func startExitNode(cmd *cobra.Command, args []string) {
+	slog.Info("Starting exit node")
 	// load the configuration
-	// from the environment
 	cfg, err := config.LoadConfig[config.ExitConfig]()
 	if err != nil {
 		panic(err)
 	}
-	updateConfigFlag(cmd, cfg)
+	if len(cfg.NostrRelays) == 0 {
+		slog.Info("No relays provided, using default relays")
+		cfg.NostrRelays = config.DefaultRelays
+	}
+	err = updateConfigFlag(cmd, cfg)
+	if err != nil {
+		panic(err)
+	}
 	ctx := cmd.Context()
 	exitNode := exit.NewExit(ctx, cfg)
 	exitNode.ListenAndServe(ctx)
+}
+
+func startEntryNode(cmd *cobra.Command, args []string) {
+	slog.Info("Starting entry node")
+	cfg, err := config.LoadConfig[config.EntryConfig]()
+	if err != nil {
+		panic(err)
+	}
+
+	// create a new gw server
+	// and start it
+	socksProxy := proxy.New(cmd.Context(), cfg)
+
+	err = socksProxy.Start()
+	if err != nil {
+		panic(err)
+	}
+
 }
