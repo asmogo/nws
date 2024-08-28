@@ -1,13 +1,9 @@
-name: gobuild
-
+name: latest
 
 on:
   push:
-    # run only against tags
-    tags:
-      - '*'
-
-
+    branches:
+      - master
 jobs:
   docker:
     runs-on: ubuntu-latest
@@ -30,4 +26,4 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: asmogo/nws:${{github.ref_name}}
+          tags: asmogo/nws:latest
