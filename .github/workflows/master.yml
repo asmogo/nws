@@ -1,10 +1,7 @@
 name: gobuild
 
-on:
-  push:
-    # run only against tags
-    tags:
-      - '*'
+on: [ push, pull_request ]
+
 
 jobs:
   docker:
