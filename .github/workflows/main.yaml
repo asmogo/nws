@@ -1,11 +1,9 @@
-name: gobuild
+name: latest
 
 on:
   push:
-    # run only against tags
-    tags:
-      - '*'
-
+    branches:
+      - master
 jobs:
   docker:
     runs-on: ubuntu-latest

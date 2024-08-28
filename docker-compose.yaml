@@ -26,7 +26,6 @@ services:
   exit:
     build:
       context: .
-      dockerfile: cmd/nws/Dockerfile
     container_name: exit
     command: [ "./nws","exit" ]
     networks:
@@ -41,7 +40,6 @@ services:
   exit-https:
     build:
       context: .
-      dockerfile: cmd/nws/Dockerfile
     container_name: exit-https
     command: ["./nws","exit","--port", "4443", "--target", "http://mint:3338"]
     networks:
@@ -56,7 +54,6 @@ services:
   entry:
     build:
       context: .
-      dockerfile: cmd/nws/Dockerfile
     command: [ "./nws","entry"]
     container_name: entry
     ports:
