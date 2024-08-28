@@ -24,5 +24,6 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           platforms: linux/amd64,linux/arm64
+          context: cmd/nws/.
           push: true
           tags: asmogo/nws:latest
