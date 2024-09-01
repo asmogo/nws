@@ -3,12 +3,14 @@ package protocol
 import (
 	"encoding/json"
 	"github.com/google/uuid"
+
+	"fmt"
 )
 
 type MessageType string
 
-var (
-	MessageTypeSocks5     = MessageType("SOCKS5")
+const (
+	MessageTypeSocks5     = MessageType("SOCKS5RESPONSE")
 	MessageConnect        = MessageType("CONNECT")
 	MessageConnectReverse = MessageType("CONNECTR")
 )
@@ -60,13 +62,17 @@ func NewMessage(configs ...MessageOption) *Message {
 	return m
 }
 func MarshalJSON(m *Message) ([]byte, error) {
-	return json.Marshal(m)
+	data, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal message: %w", err)
+	}
+	return data, nil
 }
 
 func UnmarshalJSON(data []byte) (*Message, error) {
 	m := NewMessage()
 	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal message: %w", err)
 	}
 	return m, nil
 }

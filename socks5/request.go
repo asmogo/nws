@@ -374,7 +374,10 @@ func SendReply(w io.Writer, resp uint8, addr *AddrSpec) error {
 
 	// Send the message
 	_, err := w.Write(msg)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to send reply: %w", err)
+	}
+	return nil
 }
 
 type closeWriter interface {
@@ -385,16 +388,20 @@ type closeWriter interface {
 // down a dedicated channel
 func Proxy(dst io.Writer, src io.Reader, errCh chan error) {
 	_, err := io.Copy(dst, src)
-
+	checkError(errCh, err)
 	if tcpConn, ok := dst.(closeWriter); ok {
-		tcpConn.CloseWrite()
+		err = tcpConn.CloseWrite()
 	}
 	if conn, ok := dst.(io.Closer); ok {
-		conn.Close()
+		err = conn.Close()
 	}
 	if conn, ok := src.(io.Closer); ok {
-		conn.Close()
+		err = conn.Close()
 	}
+	checkError(errCh, err)
+}
+
+func checkError(errCh chan error, err error) {
 	if errCh != nil {
 		errCh <- err
 	}
