@@ -3,13 +3,15 @@ package socks5
 import (
 	"context"
 	"fmt"
-	"github.com/asmogo/nws/netstr"
-	"github.com/asmogo/nws/protocol"
-	"github.com/google/uuid"
 	"io"
 	"net"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/asmogo/nws/netstr"
+	"github.com/asmogo/nws/protocol"
+	"github.com/google/uuid"
 )
 
 const (
@@ -193,7 +195,7 @@ func (s *Server) handleConnect(ctx context.Context, conn net.Conn, req *Request,
 
 		dial = netstr.DialSocks(options, s.config.entryConfig)
 	}
-
+	ctx, _ = context.WithTimeout(context.Background(), time.Second*10)
 	target, err := dial(ctx, "tcp", req.realDestAddr.Address())
 	if err != nil {
 		msg := err.Error()

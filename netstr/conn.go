@@ -163,6 +163,9 @@ func (nc *NostrConnection) Write(b []byte) (int, error) {
 
 // Go lang
 func (nc *NostrConnection) handleNostrWrite(buffer []byte) (int, error) {
+	if nc.ctx.Err() != nil {
+		return 0, fmt.Errorf("context canceled: %w", nc.ctx.Err())
+	}
 	publicKey, relays, err := nc.parseDestination()
 	if err != nil {
 		return 0, fmt.Errorf("could not parse destination: %w", err)

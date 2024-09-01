@@ -195,7 +195,8 @@ func (e *Exit) setSubscriptions(ctx context.Context) error {
 // It returns an error if there is any issue with the subscription.
 func (e *Exit) handleSubscription(ctx context.Context, pubKey string, since nostr.Timestamp) error {
 	incomingEventChannel := e.pool.SubMany(ctx, e.config.NostrRelays, nostr.Filters{
-		{Kinds: []int{protocol.KindEphemeralEvent},
+		{
+			Kinds: []int{protocol.KindEphemeralEvent},
 			Since: &since,
 			Tags: nostr.TagMap{
 				"p": []string{pubKey},

@@ -44,7 +44,7 @@ func DialSocks(options DialOptions, config *config.EntryConfig) func(ctx context
 		} else {
 			publicKey, relays, err = connection.parseDestination()
 			if err != nil {
-				slog.Error("error parsing host", err)
+				slog.Error("error parsing host", "error", err)
 				return nil, fmt.Errorf("error parsing host: %w", err)
 			}
 		}
