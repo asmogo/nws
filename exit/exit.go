@@ -23,7 +23,7 @@ import (
 
 const (
 	startingReverseProxyMessage = "starting exit node with https reverse proxy"
-	generateKeyMessage          = "Generated new private key. Please set your environment using the new key, otherwise your key will be lost."
+	generateKeyMessage          = "Generated new private key. Please set your environment using the new key, otherwise your key will be lost." //nolint: lll
 )
 
 // Exit represents a structure that holds information related to an exit node.
@@ -43,7 +43,7 @@ type Exit struct {
 	// It is used to establish and maintain connections between the Exit node and the backend host.
 	nostrConnectionMap *xsync.MapOf[string, *netstr.NostrConnection]
 
-	// mutexMap is a field in the Exit struct that represents a map used for synchronizing access to resources based on a string key.
+	// mutexMap is a field in the Exit struct  used for synchronizing access to resources based on a string key.
 	mutexMap *MutexMap
 
 	// incomingChannel represents a channel used to receive incoming events from relays.
@@ -87,26 +87,25 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	// start reverse proxy if https port is set
 	if exitNodeConfig.HttpsPort != 0 {
 		exitNodeConfig.BackendHost = fmt.Sprintf(":%d", exitNodeConfig.HttpsPort)
-		go func(cfg *config.ExitConfig) {
+		go func(ctx context.Context, cfg *config.ExitConfig) {
 			slog.Info(startingReverseProxyMessage, "port", cfg.HttpsPort)
-			err := exit.StartReverseProxy(cfg.HttpsTarget, cfg.HttpsPort)
+			err := exit.StartReverseProxy(ctx, cfg.HttpsTarget, cfg.HttpsPort)
 			if err != nil {
 				panic(err)
 			}
-		}(exitNodeConfig)
+		}(ctx, exitNodeConfig)
 	}
 	// set config
 	exit.config = exitNodeConfig
 	// add relays to the pool
-	for _, relayUrl := range exitNodeConfig.NostrRelays {
-		relay, err := exit.pool.EnsureRelay(relayUrl)
+	for _, relayURL := range exitNodeConfig.NostrRelays {
+		relay, err := exit.pool.EnsureRelay(relayURL)
 		if err != nil {
-			fmt.Println(err)
+			slog.Error("failed to ensure relay", "url", relayURL, "error", err)
 			continue
 		}
 		exit.relays = append(exit.relays, relay)
-		fmt.Printf("added relay connection to %s\n", relayUrl)
-
+		slog.Info("added relay connection", "url", relayURL) //nolint:forbidigo
 	}
 	domain, err := exit.getDomain()
 	if err != nil {
@@ -127,17 +126,18 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 
 // getDomain returns the domain string used by the Exit node for communication with the Nostr relays.
 // It concatenates the relay URLs using base32 encoding with no padding, separated by dots.
-// The resulting domain is then appended with the base32 encoded public key obtained using the configured Nostr private key.
+// The domain is then appended with the base32 encoded public key obtained using the configured Nostr private key.
 // The final domain string is converted to lowercase and returned.
 // If any errors occur during the process, they are returned along with an
 func (e *Exit) getDomain() (string, error) {
 	var domain string
 	// first lets build the subdomains
-	for _, relayUrl := range e.config.NostrRelays {
+	for _, relayURL := range e.config.NostrRelays {
 		if domain == "" {
-			domain = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl))
+			domain = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayURL))
 		} else {
-			domain = fmt.Sprintf("%s.%s", domain, base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayUrl)))
+			domain = fmt.Sprintf("%s.%s",
+				domain, base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(relayURL)))
 		}
 	}
 	// create base32 encoded public key
@@ -173,21 +173,20 @@ func GetPublicKeyBase32(sk string) (string, error) {
 // setSubscriptions sets up subscriptions for the Exit node to receive incoming events from the specified relays.
 // It first obtains the public key using the configured Nostr private key.
 // Then it calls the `handleSubscription` method to open a subscription to the relays with the specified filters.
-// This method runs in a separate goroutine and continuously handles the incoming events by calling the `processMessage` method.
+// This method runs in a separate goroutine and continuously handles the incoming events by calling `processMessage`
 // If the context is canceled before the subscription is established, it returns the context error.
 // If any errors occur during the process, they are returned.
 // This method should be called once when starting the Exit node.
 func (e *Exit) setSubscriptions(ctx context.Context) error {
 	pubKey, err := nostr.GetPublicKey(e.config.NostrPrivateKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get public key: %w", err)
 	}
 	now := nostr.Now()
 	if err = e.handleSubscription(ctx, pubKey, now); err != nil {
-		return err
+		return fmt.Errorf("failed to handle subscription: %w", err)
 	}
 	return nil
-
 }
 
 // handleSubscription handles the subscription to incoming events from relays based on the provided filters.
@@ -195,7 +194,8 @@ func (e *Exit) setSubscriptions(ctx context.Context) error {
 // It returns an error if there is any issue with the subscription.
 func (e *Exit) handleSubscription(ctx context.Context, pubKey string, since nostr.Timestamp) error {
 	incomingEventChannel := e.pool.SubMany(ctx, e.config.NostrRelays, nostr.Filters{
-		{Kinds: []int{protocol.KindEphemeralEvent},
+		{
+			Kinds: []int{protocol.KindEphemeralEvent},
 			Since: &since,
 			Tags: nostr.TagMap{
 				"p": []string{pubKey},
@@ -239,7 +239,7 @@ func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 	}
 	protocolMessage, err := protocol.UnmarshalJSON([]byte(decodedMessage))
 	if err != nil {
-		slog.Error("could not unmarshal message")
+		slog.Error("could not unmarshal message", "error", err)
 		return
 	}
 	destination, err := protocol.Parse(protocolMessage.Destination)
@@ -289,7 +289,10 @@ func (e *Exit) handleConnect(
 	dst, err = net.Dial("tcp", protocolMessage.Destination)
 	if err != nil {
 		slog.Error("could not connect to backend", "error", err)
-		connection.Close()
+		err = connection.Close()
+		if err != nil {
+			slog.Error("could not close connection", "error", err)
+		}
 		return
 	}
 
