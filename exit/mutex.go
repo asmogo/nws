@@ -1,7 +1,7 @@
 package exit
 
 import (
-	"fmt"
+	"log/slog"
 	"sync"
 )
 
@@ -33,8 +33,8 @@ func (mm *MutexMap) Unlock(id string) {
 	mutex, ok := mm.m[id]
 	mm.mu.Unlock()
 	if !ok {
-		panic(fmt.Sprintf("tried to unlock mutex for non-existent id %s", id))
+		slog.Error("mutex not found", "id", id)
+		return
 	}
-
 	mutex.Unlock()
 }
