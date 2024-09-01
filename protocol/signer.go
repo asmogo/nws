@@ -2,8 +2,6 @@ package protocol
 
 import (
 	"fmt"
-	"log/slog"
-
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip04"
 )
@@ -22,17 +20,16 @@ const KindPrivateKeyEvent int = 38335
 
 // EventSigner represents a signer that can create and sign events.
 //
-// EventSigner provides methods for creating unsigned events, creating signed events
+// EventSigner provides methods for creating unsigned events, creating signed events.
 type EventSigner struct {
 	PublicKey  string
 	privateKey string
 }
 
-// NewEventSigner creates a new EventSigner
+// NewEventSigner creates a new EventSigner.
 func NewEventSigner(privateKey string) (*EventSigner, error) {
 	myPublicKey, err := nostr.GetPublicKey(privateKey)
 	if err != nil {
-		slog.Error("could not generate pubkey")
 		return nil, fmt.Errorf("could not generate public key: %w", err)
 	}
 	signer := &EventSigner{
@@ -43,7 +40,7 @@ func NewEventSigner(privateKey string) (*EventSigner, error) {
 }
 
 // CreateEvent creates a new Event with the provided tags. The Public Key and the
-// current timestamp are set automatically. The Kind is set to KindEphemeralEvent
+// current timestamp are set automatically. The Kind is set to KindEphemeralEvent.
 func (s *EventSigner) CreateEvent(kind int, tags nostr.Tags) nostr.Event {
 	return nostr.Event{
 		PubKey:    s.PublicKey,
@@ -60,7 +57,7 @@ func (s *EventSigner) CreateEvent(kind int, tags nostr.Tags) nostr.Event {
 // The method then calls CreateEvent to create a new unsigned event with the provided tags.
 // The encrypted message is set as the content of the event.
 // Finally, the event is signed with the private key of the EventSigner, setting the event ID and event Sig fields.
-// The signed event is returned along with any error that occurs
+// The signed event is returned along with any error that occurs.
 func (s *EventSigner) CreateSignedEvent(
 	targetPublicKey string,
 	kind int,

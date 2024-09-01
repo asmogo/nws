@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/asmogo/nws/config"
@@ -34,18 +35,18 @@ func main() {
 func updateConfigFlag(cmd *cobra.Command, cfg *config.ExitConfig) error {
 	httpsPort, err := cmd.Flags().GetInt32("port")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get https port: %w", err)
 	}
 	httpTarget, err := cmd.Flags().GetString("target")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get http target: %w", err)
 	}
 	cfg.HttpsPort = httpsPort
 	cfg.HttpsTarget = httpTarget
 	return nil
 }
 
-func startExitNode(cmd *cobra.Command, args []string) {
+func startExitNode(cmd *cobra.Command, _ []string) {
 	slog.Info("Starting exit node")
 	// load the configuration
 	cfg, err := config.LoadConfig[config.ExitConfig]()
@@ -65,17 +66,14 @@ func startExitNode(cmd *cobra.Command, args []string) {
 	exitNode.ListenAndServe(ctx)
 }
 
-func startEntryNode(cmd *cobra.Command, args []string) {
+func startEntryNode(cmd *cobra.Command, _ []string) {
 	slog.Info("Starting entry node")
 	cfg, err := config.LoadConfig[config.EntryConfig]()
 	if err != nil {
 		panic(err)
 	}
-
 	// create a new gw server
-	// and start it
 	socksProxy := proxy.New(cmd.Context(), cfg)
-
 	err = socksProxy.Start()
 	if err != nil {
 		panic(err)
