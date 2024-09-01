@@ -14,7 +14,7 @@ import (
 
 const ten = 10
 
-var errNoPublicKey = errors.New("no public key found")
+var errNoPublicKey = errors.New("no public configuration")
 
 func (e *Exit) announceExitNode(ctx context.Context) error {
 	if !e.config.Public {

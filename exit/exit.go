@@ -119,7 +119,7 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	}
 	err = exit.announceExitNode(ctx)
 	if err != nil {
-		panic(err)
+		slog.Error("failed to announce exit node", "error", err)
 	}
 	return exit
 }
