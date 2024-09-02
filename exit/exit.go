@@ -4,6 +4,7 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"fmt"
+	"github.com/ekzyis/nip44"
 	"log/slog"
 	"net"
 	"strings"
@@ -15,7 +16,6 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip04"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/puzpuzpuz/xsync/v3"
 	"golang.org/x/net/context"
@@ -227,12 +227,18 @@ func (e *Exit) ListenAndServe(ctx context.Context) {
 // processMessage decrypts and unmarshals the incoming event message, and then
 // routes the message to the appropriate handler based on its protocol type.
 func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
-	sharedKey, err := nip04.ComputeSharedSecret(msg.PubKey, e.config.NostrPrivateKey)
+	// hex decode the target public key
+	privateKeyBytes, targetPublicKeyBytes, err := protocol.GetEncryptionKeys(e.config.NostrPrivateKey, msg.PubKey)
+	if err != nil {
+		slog.Error("could not get encryption keys", "error", err)
+		return
+	}
+	sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)
 	if err != nil {
 		slog.Error("could not compute shared key", "error", err)
 		return
 	}
-	decodedMessage, err := nip04.Decrypt(msg.Content, sharedKey)
+	decodedMessage, err := nip44.Decrypt(sharedKey, msg.Content)
 	if err != nil {
 		slog.Error("could not decrypt message", "error", err)
 		return
