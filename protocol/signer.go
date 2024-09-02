@@ -3,7 +3,6 @@ package protocol
 import (
 	"fmt"
 
-	"encoding/hex"
 	"github.com/ekzyis/nip44"
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -66,15 +65,9 @@ func (s *EventSigner) CreateSignedEvent(
 	tags nostr.Tags,
 	opts ...MessageOption,
 ) (nostr.Event, error) {
-	// hex decode the target public key
-	targetPublicKeyBytes, err := hex.DecodeString("02" + targetPublicKey)
+	privateKeyBytes, targetPublicKeyBytes, err := GetEncryptionKeys(s.privateKey, targetPublicKey)
 	if err != nil {
-		return nostr.Event{}, fmt.Errorf("could not decode target public key: %w", err)
-	}
-	// hex decode the private key
-	privateKeyBytes, err := hex.DecodeString(s.privateKey)
-	if err != nil {
-		return nostr.Event{}, fmt.Errorf("could not decode private key: %w", err)
+		return nostr.Event{}, fmt.Errorf("could not get encryption keys: %w", err)
 	}
 	sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)
 	if err != nil {

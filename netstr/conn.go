@@ -129,14 +129,9 @@ func (nc *NostrConnection) handleNostrRead(buffer []byte) (int, error) {
 			}
 			nc.readIDs = append(nc.readIDs, event.ID)
 			// hex decode the target public key
-			targetPublicKeyBytes, err := hex.DecodeString("02" + event.PubKey)
+			privateKeyBytes, targetPublicKeyBytes, err := protocol.GetEncryptionKeys(nc.privateKey, event.PubKey)
 			if err != nil {
-				return 0, fmt.Errorf("could not decode target public key: %w", err)
-			}
-			// hex decode the private key
-			privateKeyBytes, err := hex.DecodeString(nc.privateKey)
-			if err != nil {
-				return 0, fmt.Errorf("could not decode private key: %w", err)
+				return 0, fmt.Errorf("could not get encryption keys: %w", err)
 			}
 			sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)
 			if err != nil {

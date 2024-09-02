@@ -4,6 +4,7 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"fmt"
+	"github.com/ekzyis/nip44"
 	"log/slog"
 	"net"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/asmogo/nws/socks5"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
-	"github.com/ekzyis/nip44"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/puzpuzpuz/xsync/v3"
@@ -228,13 +228,9 @@ func (e *Exit) ListenAndServe(ctx context.Context) {
 // routes the message to the appropriate handler based on its protocol type.
 func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
 	// hex decode the target public key
-	targetPublicKeyBytes, err := hex.DecodeString("02" + msg.PubKey)
+	privateKeyBytes, targetPublicKeyBytes, err := protocol.GetEncryptionKeys(e.config.NostrPrivateKey, msg.PubKey)
 	if err != nil {
-		return
-	}
-	// hex decode the private key
-	privateKeyBytes, err := hex.DecodeString(e.config.NostrPrivateKey)
-	if err != nil {
+		slog.Error("could not get encryption keys", "error", err)
 		return
 	}
 	sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)

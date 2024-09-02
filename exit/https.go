@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -79,14 +78,9 @@ func (e *Exit) handleCertificateEvent(
 	if privateKeyEvent == nil {
 		return tls.Certificate{}, errNoCertificateEvent
 	}
-	targetPublicKeyBytes, err := hex.DecodeString("02" + privateKeyEvent.PubKey)
+	privateKeyBytes, targetPublicKeyBytes, err := protocol.GetEncryptionKeys(e.config.NostrPrivateKey, msg.PubKey)
 	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("could not decode target public key: %w", err)
-	}
-	// hex decode the private key
-	privateKeyBytes, err := hex.DecodeString(e.config.NostrPrivateKey)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("could not decode private key: %w", err)
+		return tls.Certificate{}, err
 	}
 	sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)
 	if err != nil {
