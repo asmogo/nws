@@ -78,7 +78,7 @@ func (e *Exit) handleCertificateEvent(
 	if privateKeyEvent == nil {
 		return tls.Certificate{}, errNoCertificateEvent
 	}
-	privateKeyBytes, targetPublicKeyBytes, err := protocol.GetEncryptionKeys(e.config.NostrPrivateKey, msg.PubKey)
+	privateKeyBytes, targetPublicKeyBytes, err := protocol.GetEncryptionKeys(e.config.NostrPrivateKey, privateKeyEvent.PubKey)
 	if err != nil {
 		return tls.Certificate{}, err
 	}
