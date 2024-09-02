@@ -14,8 +14,8 @@ import (
 	"github.com/asmogo/nws/socks5"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/ekzyis/nip44"
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip04"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/puzpuzpuz/xsync/v3"
 	"golang.org/x/net/context"
@@ -227,12 +227,22 @@ func (e *Exit) ListenAndServe(ctx context.Context) {
 // processMessage decrypts and unmarshals the incoming event message, and then
 // routes the message to the appropriate handler based on its protocol type.
 func (e *Exit) processMessage(ctx context.Context, msg nostr.IncomingEvent) {
-	sharedKey, err := nip04.ComputeSharedSecret(msg.PubKey, e.config.NostrPrivateKey)
+	// hex decode the target public key
+	targetPublicKeyBytes, err := hex.DecodeString("02" + msg.PubKey)
+	if err != nil {
+		return
+	}
+	// hex decode the private key
+	privateKeyBytes, err := hex.DecodeString(e.config.NostrPrivateKey)
+	if err != nil {
+		return
+	}
+	sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)
 	if err != nil {
 		slog.Error("could not compute shared key", "error", err)
 		return
 	}
-	decodedMessage, err := nip04.Decrypt(msg.Content, sharedKey)
+	decodedMessage, err := nip44.Decrypt(sharedKey, msg.Content)
 	if err != nil {
 		slog.Error("could not decrypt message", "error", err)
 		return

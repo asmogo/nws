@@ -15,9 +15,9 @@ import (
 
 	"github.com/asmogo/nws/protocol"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/ekzyis/nip44"
 	"github.com/google/uuid"
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip04"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/samber/lo"
 )
@@ -128,11 +128,21 @@ func (nc *NostrConnection) handleNostrRead(buffer []byte) (int, error) {
 				continue
 			}
 			nc.readIDs = append(nc.readIDs, event.ID)
-			sharedKey, err := nip04.ComputeSharedSecret(event.PubKey, nc.privateKey)
+			// hex decode the target public key
+			targetPublicKeyBytes, err := hex.DecodeString("02" + event.PubKey)
+			if err != nil {
+				return 0, fmt.Errorf("could not decode target public key: %w", err)
+			}
+			// hex decode the private key
+			privateKeyBytes, err := hex.DecodeString(nc.privateKey)
+			if err != nil {
+				return 0, fmt.Errorf("could not decode private key: %w", err)
+			}
+			sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)
 			if err != nil {
 				return 0, fmt.Errorf("could not compute shared key: %w", err)
 			}
-			decodedMessage, err := nip04.Decrypt(event.Content, sharedKey)
+			decodedMessage, err := nip44.Decrypt(sharedKey, event.Content)
 			if err != nil {
 				return 0, fmt.Errorf("could not decrypt message: %w", err)
 			}
@@ -387,7 +397,7 @@ func WithTargetPublicKey(pubKey string) NostrConnOption {
 func WithSub(...bool) NostrConnOption {
 	return func(connection *NostrConnection) {
 		connection.sub = true
-		go connection.handleSubscription()
+		//go connection.handleSubscription()
 	}
 }
 
@@ -404,32 +414,5 @@ func WithDst(dst string) NostrConnOption {
 func WithUUID(uuid uuid.UUID) NostrConnOption {
 	return func(connection *NostrConnection) {
 		connection.uuid = uuid
-	}
-}
-
-// handleSubscription handles the subscription channel for incoming events.
-// It continuously listens for events on the subscription channel and performs necessary operations.
-// If the event has a valid relay, it computes the shared key and decrypts the event content.
-// The decrypted message is then written to the read buffer.
-// If the context is canceled, the method returns.
-func (nc *NostrConnection) handleSubscription() {
-	for {
-		select {
-		case event := <-nc.subscriptionChan:
-			if event.Relay == nil {
-				continue
-			}
-			sharedKey, err := nip04.ComputeSharedSecret(event.PubKey, nc.privateKey)
-			if err != nil {
-				continue
-			}
-			decodedMessage, err := nip04.Decrypt(event.Content, sharedKey)
-			if err != nil {
-				continue
-			}
-			nc.readBuffer.Write([]byte(decodedMessage))
-		case <-nc.ctx.Done():
-			return
-		}
 	}
 }

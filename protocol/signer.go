@@ -2,8 +2,10 @@ package protocol
 
 import (
 	"fmt"
+
+	"encoding/hex"
+	"github.com/ekzyis/nip44"
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip04"
 )
 
 // KindEphemeralEvent represents the unique identifier for ephemeral events.
@@ -64,7 +66,17 @@ func (s *EventSigner) CreateSignedEvent(
 	tags nostr.Tags,
 	opts ...MessageOption,
 ) (nostr.Event, error) {
-	sharedKey, err := nip04.ComputeSharedSecret(targetPublicKey, s.privateKey)
+	// hex decode the target public key
+	targetPublicKeyBytes, err := hex.DecodeString("02" + targetPublicKey)
+	if err != nil {
+		return nostr.Event{}, fmt.Errorf("could not decode target public key: %w", err)
+	}
+	// hex decode the private key
+	privateKeyBytes, err := hex.DecodeString(s.privateKey)
+	if err != nil {
+		return nostr.Event{}, fmt.Errorf("could not decode private key: %w", err)
+	}
+	sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)
 	if err != nil {
 		return nostr.Event{}, fmt.Errorf("could not compute shared key: %w", err)
 	}
@@ -75,7 +87,10 @@ func (s *EventSigner) CreateSignedEvent(
 	if err != nil {
 		return nostr.Event{}, fmt.Errorf("could not marshal message: %w", err)
 	}
-	encryptedMessage, err := nip04.Encrypt(string(messageJSON), sharedKey)
+	encryptedMessage, err := nip44.Encrypt(sharedKey, string(messageJSON), &nip44.EncryptOptions{
+		Salt:    nil,
+		Version: 0,
+	})
 	if err != nil {
 		return nostr.Event{}, fmt.Errorf("could not encrypt message: %w", err)
 	}

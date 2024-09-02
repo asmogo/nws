@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -19,8 +20,8 @@ import (
 	"time"
 
 	"github.com/asmogo/nws/protocol"
+	"github.com/ekzyis/nip44"
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip04"
 )
 
 const (
@@ -63,7 +64,11 @@ func (e *Exit) StartReverseProxy(ctx context.Context, httpTarget string, port in
 
 }
 
-func (e *Exit) handleCertificateEvent(incomingEvent *nostr.IncomingEvent, ctx context.Context, cert tls.Certificate) (tls.Certificate, error) {
+func (e *Exit) handleCertificateEvent(
+	incomingEvent *nostr.IncomingEvent,
+	ctx context.Context,
+	cert tls.Certificate,
+) (tls.Certificate, error) {
 	slog.Info("found certificate event", "certificate", incomingEvent.Content)
 	// load private key from file
 	privateKeyEvent := e.pool.QuerySingle(ctx, e.config.NostrRelays, nostr.Filter{
@@ -74,11 +79,20 @@ func (e *Exit) handleCertificateEvent(incomingEvent *nostr.IncomingEvent, ctx co
 	if privateKeyEvent == nil {
 		return tls.Certificate{}, errNoCertificateEvent
 	}
-	sharedKey, err := nip04.ComputeSharedSecret(privateKeyEvent.PubKey, e.config.NostrPrivateKey)
+	targetPublicKeyBytes, err := hex.DecodeString("02" + privateKeyEvent.PubKey)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("could not decode target public key: %w", err)
+	}
+	// hex decode the private key
+	privateKeyBytes, err := hex.DecodeString(e.config.NostrPrivateKey)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("could not decode private key: %w", err)
+	}
+	sharedKey, err := nip44.GenerateConversationKey(privateKeyBytes, targetPublicKeyBytes)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("failed to compute shared key: %w", err)
 	}
-	decodedMessage, err := nip04.Decrypt(privateKeyEvent.Content, sharedKey)
+	decodedMessage, err := nip44.Decrypt(sharedKey, privateKeyEvent.Content)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("failed to decrypt private key: %w", err)
 	}

@@ -1,9 +1,11 @@
 module github.com/asmogo/nws
 
-go 1.21
+go 1.21.0
 
 require (
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/caarlos0/env/v11 v11.0.0
+	github.com/ekzyis/nip44 v0.0.0-20240425094820-6a3d864c8f08
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/nbd-wtf/go-nostr v0.30.2
@@ -15,7 +17,6 @@ require (
 )
 
 require (
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.3 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -34,6 +35,7 @@ require (
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
+	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
