@@ -2,6 +2,9 @@ package netstr
 
 import (
 	"context"
+	"fmt"
+	"github.com/asmogo/nws/protocol"
+	"github.com/ekzyis/nip44"
 	"github.com/nbd-wtf/go-nostr"
 	"runtime"
 	"testing"
@@ -41,7 +44,7 @@ func TestNostrConnection_Read(t *testing.T) {
 				Event: &nostr.Event{
 					ID:      "eventID",
 					PubKey:  "8f97a664471f0b6d599a1e4a781c9a25f39902d96fb462c08df48697bb851611",
-					Content: "BnHzzyrUhKjDcDPOGfXJDYijUsgxw0hUZq2m+bX5QFI=?iv=NrEqv/jL+SASB2YTjo9i9Q=="}},
+					Content: `AuaBj8mXZ9n9IfdonNra0lpaed6Alc+H0xjUdyN9h6mCSuy7ZrEjWUZQj4HWNd4P1RCme1pda0z8hyItT4nVzESByRiQT5+hf+ij0aJw9+DW/ggJIWGbpm4wp7bk4loYKdERr+nzorqEjWNzpxsJXhXJ0nKtIxu61To5XY4SjuMqpUuOtznuHiPJJhKNWSSRPV92L/iVoOnjKJhfR5jOWBK3vA==`}},
 			nc: func() *NostrConnection {
 				ctx, cancelFunc := context.WithCancel(context.Background())
 				return &NostrConnection{
@@ -52,7 +55,7 @@ func TestNostrConnection_Read(t *testing.T) {
 					privateKey:       "788de536151854213cc28dff9c3042e7897f0a1d59b391ddbbc1619d7e716e78",
 				}
 			},
-			wantN:   11, // hello world
+			wantN:   5, // hello world
 			wantErr: false,
 		},
 		// Add more cases here to cover more corner situations
@@ -62,6 +65,17 @@ func TestNostrConnection_Read(t *testing.T) {
 			nc := tt.nc()
 			defer nc.Close()
 			b := make([]byte, 1024)
+			if tt.event.Event != nil {
+				private, public, err := protocol.GetEncryptionKeys(nc.privateKey, tt.event.PubKey)
+				if err != nil {
+					panic(err)
+				}
+				sharedKey, err := nip44.GenerateConversationKey(private, public)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Println(nip44.Encrypt(sharedKey, tt.event.Content, &nip44.EncryptOptions{}))
+			}
 			nc.subscriptionChan <- tt.event
 			gotN, err := nc.Read(b)
 			if (err != nil) != tt.wantErr {
