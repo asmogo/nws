@@ -3,12 +3,13 @@ package netstr
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net"
+
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/protocol"
 	"github.com/google/uuid"
 	"github.com/nbd-wtf/go-nostr"
-	"log/slog"
-	"net"
 )
 
 type DialOptions struct {
@@ -25,7 +26,10 @@ type DialOptions struct {
 // It creates a signed event using the private key, public key, and destination address.
 // It ensures that the relays are available in the pool and publishes the signed event to each relay.
 // Finally, it returns the Connection and nil error. If there are any errors, nil connection and the error are returned.
-func DialSocks(options DialOptions, config *config.EntryConfig) func(ctx context.Context, net_, addr string) (net.Conn, error) {
+func DialSocks(
+	options DialOptions,
+	config *config.EntryConfig,
+) func(ctx context.Context, net_, addr string) (net.Conn, error) {
 	return func(ctx context.Context, net_, addr string) (net.Conn, error) {
 		key := nostr.GeneratePrivateKey()
 		connection := NewConnection(ctx,
@@ -51,7 +55,7 @@ func DialSocks(options DialOptions, config *config.EntryConfig) func(ctx context
 		// create nostr signed event
 		signer, err := protocol.NewEventSigner(key)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error creating signer: %w", err)
 		}
 		opts := []protocol.MessageOption{
 			protocol.WithType(options.MessageType),
@@ -67,14 +71,15 @@ func DialSocks(options DialOptions, config *config.EntryConfig) func(ctx context
 			opts...)
 
 		for _, relayUrl := range relays {
-			relay, err := options.Pool.EnsureRelay(relayUrl)
+			var relay *nostr.Relay
+			relay, err = options.Pool.EnsureRelay(relayUrl)
 			if err != nil {
 				slog.Error("error creating relay", err)
 				continue
 			}
 			err = relay.Publish(ctx, ev)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error publishing event: %w", err)
 			}
 		}
 		return connection, nil
