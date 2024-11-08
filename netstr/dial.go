@@ -29,8 +29,8 @@ type DialOptions struct {
 func DialSocks(
 	options DialOptions,
 	config *config.EntryConfig,
-) func(ctx context.Context, net_, addr string) (net.Conn, error) {
-	return func(ctx context.Context, net_, addr string) (net.Conn, error) {
+) func(ctx context.Context, _, addr string) (net.Conn, error) {
+	return func(ctx context.Context, _, addr string) (net.Conn, error) {
 		key := nostr.GeneratePrivateKey()
 		connection := NewConnection(ctx,
 			WithPrivateKey(key),
@@ -66,22 +66,41 @@ func DialSocks(
 		}
 		opts = append(opts, protocol.WithDestination(addr))
 
-		ev, err := signer.CreateSignedEvent(publicKey, protocol.KindEphemeralEvent,
-			nostr.Tags{nostr.Tag{"p", publicKey}},
-			opts...)
-
-		for _, relayUrl := range relays {
-			var relay *nostr.Relay
-			relay, err = options.Pool.EnsureRelay(relayUrl)
-			if err != nil {
-				slog.Error("error creating relay", err)
-				continue
-			}
-			err = relay.Publish(ctx, ev)
-			if err != nil {
-				return nil, fmt.Errorf("error publishing event: %w", err)
-			}
+		err = createAndPublish(ctx, signer, publicKey, opts, relays, options)
+		if err != nil {
+			return nil, fmt.Errorf("error publishing event: %w", err)
 		}
 		return connection, nil
 	}
+}
+
+func createAndPublish(
+	ctx context.Context,
+	signer *protocol.EventSigner,
+	publicKey string,
+	opts []protocol.MessageOption,
+	relays []string,
+	options DialOptions,
+) error {
+	ev, err := signer.CreateSignedEvent(
+		publicKey,
+		protocol.KindEphemeralEvent,
+		nostr.Tags{nostr.Tag{"p", publicKey}},
+		opts...)
+	if err != nil {
+		return fmt.Errorf("error creating signed event: %w", err)
+	}
+	for _, relayUrl := range relays {
+		var relay *nostr.Relay
+		relay, err = options.Pool.EnsureRelay(relayUrl)
+		if err != nil {
+			slog.Error("error creating relay", err)
+			continue
+		}
+		err = relay.Publish(ctx, ev)
+		if err != nil {
+			return fmt.Errorf("error publishing event: %w", err)
+		}
+	}
+	return nil
 }
