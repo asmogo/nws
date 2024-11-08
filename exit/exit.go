@@ -53,12 +53,23 @@ type Exit struct {
 	publicKey string
 }
 
-// NewExit creates a new Exit node with the provided context and config.
+func newExit(pool *nostr.SimplePool, pubKey string, profile string) *Exit {
+	exit := &Exit{
+		nostrConnectionMap: xsync.NewMapOf[string, *netstr.NostrConnection](),
+		pool:               pool,
+		mutexMap:           NewMutexMap(),
+		publicKey:          pubKey,
+		nprofile:           profile,
+	}
+	return exit
+}
+
+// New creates a newExit Exit node with the provided context and config.
 // This function will currently panic if there is an error while creating the Exit node.
-func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
-	// generate new private key if it is not set
+func New(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
+	// generate newExit private key if it is not set
 	if exitNodeConfig.NostrPrivateKey == "" {
-		// generate new private key
+		// generate newExit private key
 		exitNodeConfig.NostrPrivateKey = nostr.GeneratePrivateKey()
 		slog.Warn(generateKeyMessage, "key", exitNodeConfig.NostrPrivateKey)
 	}
@@ -74,16 +85,10 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	if err != nil {
 		panic(err)
 	}
-	// create a new pool
+	// create a newExit pool
 	pool := nostr.NewSimplePool(ctx)
 
-	exit := &Exit{
-		nostrConnectionMap: xsync.NewMapOf[string, *netstr.NostrConnection](),
-		pool:               pool,
-		mutexMap:           NewMutexMap(),
-		publicKey:          pubKey,
-		nprofile:           profile,
-	}
+	exit := newExit(pool, pubKey, profile)
 	// start reverse proxy if https port is set
 	if exitNodeConfig.HttpsPort != 0 {
 		exitNodeConfig.BackendHost = fmt.Sprintf(":%d", exitNodeConfig.HttpsPort)
@@ -105,7 +110,7 @@ func NewExit(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 			continue
 		}
 		exit.relays = append(exit.relays, relay)
-		slog.Info("added relay connection", "url", relayURL) //nolint:forbidigo
+		slog.Info("added relay connection", "url", relayURL)
 	}
 	domain, err := exit.getDomain()
 	if err != nil {
