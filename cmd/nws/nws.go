@@ -62,7 +62,7 @@ func startExitNode(cmd *cobra.Command, _ []string) {
 		panic(err)
 	}
 	ctx := cmd.Context()
-	exitNode := exit.NewExit(ctx, cfg)
+	exitNode := exit.New(ctx, cfg)
 	exitNode.ListenAndServe(ctx)
 }
 
