@@ -74,6 +74,8 @@ func DialSocks(
 	}
 }
 
+// createAndPublish creates a signed event using the provided signer, public key, message options, and relays.
+// It then publishes the event to each relay. Returns an error if signing or publishing fails.
 func createAndPublish(
 	ctx context.Context,
 	signer *protocol.EventSigner,
@@ -82,7 +84,7 @@ func createAndPublish(
 	relays []string,
 	options DialOptions,
 ) error {
-	ev, err := signer.CreateSignedEvent(
+	signedEvent, err := signer.CreateSignedEvent(
 		publicKey,
 		protocol.KindEphemeralEvent,
 		nostr.Tags{nostr.Tag{"p", publicKey}},
@@ -90,14 +92,14 @@ func createAndPublish(
 	if err != nil {
 		return fmt.Errorf("error creating signed event: %w", err)
 	}
-	for _, relayUrl := range relays {
+	for _, relayURL := range relays {
 		var relay *nostr.Relay
-		relay, err = options.Pool.EnsureRelay(relayUrl)
+		relay, err = options.Pool.EnsureRelay(relayURL)
 		if err != nil {
-			slog.Error("error creating relay", err)
+			slog.Error("error creating relay", "error", err)
 			continue
 		}
-		err = relay.Publish(ctx, ev)
+		err = relay.Publish(ctx, signedEvent)
 		if err != nil {
 			return fmt.Errorf("error publishing event: %w", err)
 		}
