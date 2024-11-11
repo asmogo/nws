@@ -4,7 +4,6 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"fmt"
-	"github.com/ekzyis/nip44"
 	"log/slog"
 	"net"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"github.com/asmogo/nws/socks5"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/ekzyis/nip44"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/puzpuzpuz/xsync/v3"
@@ -28,29 +28,60 @@ const (
 
 // Exit represents a structure that holds information related to an exit node.
 type Exit struct {
-
 	// pool represents a pool of relays and manages the subscription to incoming events from relays.
 	pool *nostr.SimplePool
-
 	// config is a field in the Exit struct that holds information related to exit node configuration.
 	config *config.ExitConfig
-
 	// relays represents a slice of *nostr.Relay, which contains information about the relay nodes used by the Exit node.
 	// Todo -- check if this is deprecated
 	relays []*nostr.Relay
-
 	// nostrConnectionMap is a concurrent map used to store connections for the Exit node.
 	// It is used to establish and maintain connections between the Exit node and the backend host.
 	nostrConnectionMap *xsync.MapOf[string, *netstr.NostrConnection]
-
 	// mutexMap is a field in the Exit struct  used for synchronizing access to resources based on a string key.
 	mutexMap *MutexMap
-
 	// incomingChannel represents a channel used to receive incoming events from relays.
 	incomingChannel chan nostr.IncomingEvent
+	nprofile        string
+	publicKey       string
+}
 
-	nprofile  string
-	publicKey string
+func New(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
+	// Generate new private key if needed
+	generatePrivateKeyIfNeeded(exitNodeConfig)
+
+	// Create a new exit node
+	exit, err := createExitNode(ctx, exitNodeConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	// Setup reverse proxy if HTTPS port is set
+	setupReverseProxy(ctx, exit, exitNodeConfig)
+
+	// Add relays to the pool
+	addRelaysToPool(exit, exitNodeConfig.NostrRelays)
+
+	if err := exit.setSubscriptions(ctx); err != nil {
+		panic(err)
+	}
+
+	if err := exit.announceExitNode(ctx); err != nil {
+		slog.Error("failed to announce exit node", "error", err)
+	}
+
+	printExitNodeInfo(exit, exitNodeConfig)
+
+	return exit
+}
+
+func printExitNodeInfo(exit *Exit, exitNodeConfig *config.ExitConfig) {
+	// Set up remaining steps for the exit node
+	domain, err := exit.getDomain()
+	if err != nil {
+		panic(err)
+	}
+	slog.Info("created exit node", "profile", exitNodeConfig.NostrRelays, "domain", domain)
 }
 
 func newExit(pool *nostr.SimplePool, pubKey string, profile string) *Exit {
@@ -64,46 +95,47 @@ func newExit(pool *nostr.SimplePool, pubKey string, profile string) *Exit {
 	return exit
 }
 
-// New creates a newExit Exit node with the provided context and config.
-// This function will currently panic if there is an error while creating the Exit node.
-func New(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
-	// generate newExit private key if it is not set
-	if exitNodeConfig.NostrPrivateKey == "" {
-		// generate newExit private key
-		exitNodeConfig.NostrPrivateKey = nostr.GeneratePrivateKey()
-		slog.Warn(generateKeyMessage, "key", exitNodeConfig.NostrPrivateKey)
+func generatePrivateKeyIfNeeded(cfg *config.ExitConfig) {
+	if cfg.NostrPrivateKey == "" {
+		cfg.NostrPrivateKey = nostr.GeneratePrivateKey()
+		slog.Warn(generateKeyMessage, "key", cfg.NostrPrivateKey)
 	}
-	// get public key from private key
-	pubKey, err := nostr.GetPublicKey(exitNodeConfig.NostrPrivateKey)
-	slog.Info("using public key", "key", pubKey)
-	if err != nil {
-		panic(err)
-	}
-	// encode profile
-	profile, err := nip19.EncodeProfile(pubKey,
-		exitNodeConfig.NostrRelays)
-	if err != nil {
-		panic(err)
-	}
-	// create a newExit pool
-	pool := nostr.NewSimplePool(ctx)
+}
 
+func createExitNode(ctx context.Context, cfg *config.ExitConfig) (*Exit, error) {
+	pubKey, err := nostr.GetPublicKey(cfg.NostrPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get public key: %w", err)
+	}
+	slog.Info("using public key", "key", pubKey)
+
+	profile, err := nip19.EncodeProfile(pubKey, cfg.NostrRelays)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode profile: %w", err)
+	}
+
+	pool := nostr.NewSimplePool(ctx)
 	exit := newExit(pool, pubKey, profile)
-	// start reverse proxy if https port is set
-	if exitNodeConfig.HttpsPort != 0 {
-		exitNodeConfig.BackendHost = fmt.Sprintf(":%d", exitNodeConfig.HttpsPort)
+	exit.config = cfg
+
+	return exit, nil
+}
+
+func setupReverseProxy(ctx context.Context, exit *Exit, cfg *config.ExitConfig) {
+	if cfg.HttpsPort != 0 {
+		cfg.BackendHost = fmt.Sprintf(":%d", cfg.HttpsPort)
 		go func(ctx context.Context, cfg *config.ExitConfig) {
 			slog.Info(startingReverseProxyMessage, "port", cfg.HttpsPort)
 			err := exit.StartReverseProxy(ctx, cfg.HttpsTarget, cfg.HttpsPort)
 			if err != nil {
 				panic(err)
 			}
-		}(ctx, exitNodeConfig)
+		}(ctx, cfg)
 	}
-	// set config
-	exit.config = exitNodeConfig
-	// add relays to the pool
-	for _, relayURL := range exitNodeConfig.NostrRelays {
+}
+
+func addRelaysToPool(exit *Exit, relays []string) {
+	for _, relayURL := range relays {
 		relay, err := exit.pool.EnsureRelay(relayURL)
 		if err != nil {
 			slog.Error("failed to ensure relay", "url", relayURL, "error", err)
@@ -112,28 +144,12 @@ func New(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 		exit.relays = append(exit.relays, relay)
 		slog.Info("added relay connection", "url", relayURL)
 	}
-	domain, err := exit.getDomain()
-	if err != nil {
-		panic(err)
-	}
-	slog.Info("created exit node", "profile", profile, "domain", domain)
-	// setup subscriptions
-	err = exit.setSubscriptions(ctx)
-	if err != nil {
-		panic(err)
-	}
-	err = exit.announceExitNode(ctx)
-	if err != nil {
-		slog.Error("failed to announce exit node", "error", err)
-	}
-	return exit
 }
 
 // getDomain returns the domain string used by the Exit node for communication with the Nostr relays.
 // It concatenates the relay URLs using base32 encoding with no padding, separated by dots.
 // The domain is then appended with the base32 encoded public key obtained using the configured Nostr private key.
 // The final domain string is converted to lowercase and returned.
-// If any errors occur during the process, they are returned along with an
 func (e *Exit) getDomain() (string, error) {
 	var domain string
 	// first lets build the subdomains
@@ -159,17 +175,10 @@ func (e *Exit) getDomain() (string, error) {
 // and returns the base32 encoded public key obtained using the provided private key.
 // The base32 encoding has no padding. If there is an error decoding the private key
 // or generating the public key, an error is returned.
-//
-// Parameters:
-// - sk: The private key string in hexadecimal format
-//
-// Returns:
-// - The base32 encoded public key as a string
-// - Any error that occurred during the process
 func GetPublicKeyBase32(sk string) (string, error) {
 	b, err := hex.DecodeString(sk)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to decode private key: %w", err)
 	}
 	_, pk := btcec.PrivKeyFromBytes(b)
 	return base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(schnorr.SerializePubKey(pk)), nil
@@ -187,8 +196,7 @@ func (e *Exit) setSubscriptions(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get public key: %w", err)
 	}
-	now := nostr.Now()
-	if err = e.handleSubscription(ctx, pubKey, now); err != nil {
+	if err = e.handleSubscription(ctx, pubKey, nostr.Now()); err != nil {
 		return fmt.Errorf("failed to handle subscription: %w", err)
 	}
 	return nil
