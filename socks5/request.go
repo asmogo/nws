@@ -137,8 +137,11 @@ func (s *Server) handleRequest(req *Request, conn net.Conn) error {
 		}
 		ctx = ctx_
 		dest.IP = addr
-		if pubKey := ctx.Value("publicKey"); pubKey != nil {
-			targetPublicKey = pubKey.(string)
+		if pubKey := ctx.Value(netstr.TargetPublicKey); pubKey != nil {
+			var ok bool
+			if targetPublicKey, ok = pubKey.(string); !ok {
+				return fmt.Errorf("failed to get target public key: %w", err)
+			}
 		}
 	}
 
