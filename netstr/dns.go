@@ -2,6 +2,7 @@ package netstr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -11,11 +12,17 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
-// NostrDNS does not resolve anything
+// NostrDNS does not resolve anything.
 type NostrDNS struct {
 	pool        *nostr.SimplePool
 	nostrRelays []string
 }
+
+var (
+	errPoolIsNil                 = errors.New("pool is nil")
+	errFailedToFindExitNodeEvent = errors.New("failed to find exit node event")
+	errExitNodeEventIsExpired    = errors.New("exit node event is expired")
+)
 
 func NewNostrDNS(pool *nostr.SimplePool, nostrRelays []string) *NostrDNS {
 	return &NostrDNS{
@@ -31,10 +38,10 @@ func (d NostrDNS) Resolve(ctx context.Context, name string) (context.Context, ne
 	}
 	addr, err := net.ResolveIPAddr("ip", name)
 	if err != nil {
-		return ctx, nil, err
+		return ctx, nil, fmt.Errorf("failed to resolve ip address: %w", err)
 	}
 	if d.pool == nil {
-		return ctx, nil, fmt.Errorf("pool is nil")
+		return ctx, nil, errPoolIsNil
 	}
 	since := nostr.Timestamp(time.Now().Add(-time.Second * 10).Unix())
 	ev := d.pool.QuerySingle(ctx, d.nostrRelays, nostr.Filter{
@@ -42,11 +49,15 @@ func (d NostrDNS) Resolve(ctx context.Context, name string) (context.Context, ne
 		Since: &since,
 	})
 	if ev == nil {
-		return ctx, nil, fmt.Errorf("failed to find exit node event")
+		return ctx, nil, errFailedToFindExitNodeEvent
 	}
 	if ev.CreatedAt < since {
-		return ctx, nil, fmt.Errorf("exit node event is expired")
+		return ctx, nil, errExitNodeEventIsExpired
 	}
-	ctx = context.WithValue(ctx, "publicKey", ev.PubKey)
-	return ctx, addr.IP, err
+	ctx = context.WithValue(ctx, TargetPublicKey, ev.PubKey)
+	return ctx, addr.IP, nil
 }
+
+type ContextKeyTargetPublicKey string
+
+const TargetPublicKey ContextKeyTargetPublicKey = "TargetPublicKey"
