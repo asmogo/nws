@@ -2,9 +2,9 @@ package protocol
 
 import (
 	"encoding/json"
-	"github.com/google/uuid"
-
 	"fmt"
+
+	"github.com/google/uuid"
 )
 
 type MessageType string
@@ -16,11 +16,11 @@ const (
 )
 
 type Message struct {
-	Key                uuid.UUID   `json:"key,omitempty"`
-	Type               MessageType `json:"type,omitempty"`
-	Data               []byte      `json:"data,omitempty"`
-	Destination        string      `json:"destination,omitempty"`
-	EntryPublicAddress string      `json:"entryPublicAddress,omitempty"`
+	Key                uuid.UUID   `json:"key,omitempty"`                // unique identifier for the message
+	Type               MessageType `json:"type,omitempty"`               // type of message
+	Data               []byte      `json:"data,omitempty"`               // data to be sent
+	Destination        string      `json:"destination,omitempty"`        // destination to send the message
+	EntryPublicAddress string      `json:"entryPublicAddress,omitempty"` // public ip address of the entry node (used for reverse connect)
 }
 
 type MessageOption func(*Message)
