@@ -276,7 +276,7 @@ func IsDomainName(name string) bool { //nolint:cyclop
 	split := strings.Split(name, ".")
 
 	// Need a TLD and a domain.
-	if len(split) < 2 { //nolint:gomnd
+	if len(split) < 2 { //nolint:mnd
 		return false
 	}
 	l := len(name)
@@ -325,8 +325,10 @@ func IsDomainName(name string) bool { //nolint:cyclop
 }
 
 // RemoveScheme removes the scheme from a URL string.
-// If the URL string includes a scheme (e.g., "http://"), the scheme will be removed and the remaining string will be returned.
-// If the URL string includes a default scheme (e.g., "//"), the default scheme will be removed and the remaining string will be returned.
+// If the URL string includes a scheme (e.g., "http://"),
+// the scheme will be removed and the remaining string will be returned.
+// If the URL string includes a default scheme (e.g., "//"),
+// the default scheme will be removed and the remaining string will be returned.
 // If the URL string does not include a scheme, the original string will be returned unchanged.
 func RemoveScheme(s string) string {
 	if strings.Contains(s, "://") {
@@ -374,7 +376,7 @@ func removeScheme(s string) string {
 
 // index returns the starting index of the first occurrence of the specified scheme in the given string.
 // If the scheme is not found, it returns -1.
-// The returned index is incremented by the length of the scheme to obtain the starting position of the remaining string.
+// The returned int is incremented by the length of the scheme to obtain the starting position of the remaining string.
 func index(s, scheme string) int {
 	return strings.Index(s, scheme) + len(scheme)
 }
