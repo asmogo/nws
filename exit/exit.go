@@ -8,11 +8,12 @@ import (
 	"net"
 	"strings"
 
+	"github.com/asmogo/gonuts/mint"
 	"github.com/asmogo/nws/config"
 	"github.com/asmogo/nws/netstr"
 	"github.com/asmogo/nws/protocol"
 	"github.com/asmogo/nws/socks5"
-	"github.com/btcsuite/btcd/btcec/v2"
+	btcec2 "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/ekzyis/nip44"
 	"github.com/nbd-wtf/go-nostr"
@@ -44,6 +45,7 @@ type Exit struct {
 	incomingChannel chan nostr.IncomingEvent
 	nprofile        string
 	publicKey       string
+	mint            *mint.Mint
 }
 
 func New(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
@@ -69,10 +71,27 @@ func New(ctx context.Context, exitNodeConfig *config.ExitConfig) *Exit {
 	if err := exit.announceExitNode(ctx); err != nil {
 		slog.Error("failed to announce exit node", "error", err)
 	}
+	if err := exit.initializeMint(); err != nil {
+		panic(err)
+	}
 
 	printExitNodeInfo(exit, exitNodeConfig)
 
 	return exit
+}
+
+// initializeMint initializes the mint client
+func (e *Exit) initializeMint() error {
+	mintConfig, err := mint.ConfigFromEnv()
+	if err != nil {
+		return fmt.Errorf("failed to initialize mint config: %w", err)
+	}
+	cashuMint, err := mint.LoadMint(*mintConfig)
+	if err != nil {
+		return fmt.Errorf("failed to initialize mint: %w", err)
+	}
+	e.mint = cashuMint
+	return nil
 }
 
 func printExitNodeInfo(exit *Exit, exitNodeConfig *config.ExitConfig) {
@@ -180,7 +199,7 @@ func GetPublicKeyBase32(sk string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to decode private key: %w", err)
 	}
-	_, pk := btcec.PrivKeyFromBytes(b)
+	_, pk := btcec2.PrivKeyFromBytes(b)
 	return base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(schnorr.SerializePubKey(pk)), nil
 }
 
