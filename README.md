@@ -1,4 +1,6 @@
 
+
+```markdown
 # Nostr Web Services (NWS)
 
 NWS replaces the IP layer in TCP transport using Nostr, enabling secure connections between clients and backend services.
@@ -99,6 +101,12 @@ To start the exit node, use this command:
 go run cmd/nws/nws.go exit
 ```
 
+To enable the HTTPS reverse proxy (as demonstrated by the `exit-https` service in Docker Compose), use the `--port` and `--target` flags to specify the listening port and your backend service URL:
+
+```bash
+go run cmd/nws/nws.go exit --port 4443 --target http://localhost:3338
+```
+
 If your backend services support TLS, your service can now start using TLS encryption through a publicly available entry node.
 
 ---
@@ -119,3 +127,4 @@ PUBLIC_ADDRESS='<public_ip>:<port>'
 
 - `PUBLIC_ADDRESS`: This can be set if the entry node is publicly available. Exit node discovery will still be done using Nostr. Once a connection is established, this public address will be used to transmit further data. (`<ip/domain>:<port>`)
 - `NOSTR_RELAYS`: A list of Nostr relays to publish events to. Used only if there is no relay data in the request.
+```
